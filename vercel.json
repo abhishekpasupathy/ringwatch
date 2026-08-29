@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "functions": {
+    "app/api/graph/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/explain/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/metrics/route.ts": {
+      "maxDuration": 10
+    }
+  }
+}

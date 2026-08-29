@@ -1,0 +1,117 @@
+// RingWatch — Prisma schema (Prisma v5)
+// Maps IBM AML HI-Small CSV onto a merchant-protection framing.
+// accounts.isIllicitLabel = true if ANY of the account's transactions
+// has Is Laundering = 1 in the source CSV.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Split {
+  TRAIN
+  TEST
+}
+
+model Account {
+  id             String  @id
+  bank           Int
+  accountNum     String  @map("account_num")
+  isIllicitLabel Boolean @default(false) @map("is_illicit_label")
+
+  outgoing       Transaction[]   @relation("FromAccount")
+  incoming       Transaction[]   @relation("ToAccount")
+  clusterMembers ClusterMember[]
+
+  @@index([isIllicitLabel])
+  @@map("accounts")
+}
+
+model Transaction {
+  id                Int      @id @default(autoincrement())
+  fromAccountId     String   @map("from_account_id")
+  toAccountId       String   @map("to_account_id")
+  amountPaid        Float    @map("amount_paid")
+  amountReceived    Float    @map("amount_received")
+  paymentCurrency   String   @map("payment_currency")
+  receivingCurrency String   @map("receiving_currency")
+  paymentFormat     String   @map("payment_format")
+  timestamp         DateTime
+  isLaunderingLabel Boolean  @default(false) @map("is_laundering_label")
+  split             Split
+
+  fromAccount Account @relation("FromAccount", fields: [fromAccountId], references: [id])
+  toAccount   Account @relation("ToAccount", fields: [toAccountId], references: [id])
+
+  @@index([split])
+  @@index([timestamp])
+  @@index([isLaunderingLabel])
+  @@index([fromAccountId])
+  @@index([toAccountId])
+  @@map("transactions")
+}
+
+model DetectionRun {
+  id              Int      @id @default(autoincrement())
+  runAt           DateTime @default(now()) @map("run_at")
+  split           Split
+  threshold       Float
+  modularityScore Float    @map("modularity_score")
+  clusters        Cluster[]
+
+  @@map("detection_runs")
+}
+
+model Cluster {
+  id                 Int     @id @default(autoincrement())
+  runId              Int     @map("run_id")
+  communityId        Int     @map("community_id")
+  isFlagged          Boolean @default(false) @map("is_flagged")
+  suspicionScore     Float   @map("suspicion_score")
+  internalEdgeRatio  Float   @map("internal_edge_ratio")
+  timeBurstFraction  Float   @map("time_burst_fraction")
+  paymentFormatCount Int     @map("payment_format_count")
+  memberCount        Int     @map("member_count")
+  illicitMemberCount Int     @map("illicit_member_count")
+  licitMemberCount   Int     @map("licit_member_count")
+
+  run     DetectionRun    @relation(fields: [runId], references: [id])
+  members ClusterMember[]
+
+  @@index([runId, isFlagged])
+  @@map("clusters")
+}
+
+model ClusterMember {
+  id        Int     @id @default(autoincrement())
+  clusterId Int     @map("cluster_id")
+  accountId String  @map("account_id")
+  isIllicit Boolean @map("is_illicit")
+  isExposed Boolean @map("is_exposed")
+
+  cluster Cluster @relation(fields: [clusterId], references: [id])
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@unique([clusterId, accountId])
+  @@map("cluster_members")
+}
+
+model EvalMetrics {
+  id         Int      @id @default(autoincrement())
+  runAt      DateTime @default(now()) @map("run_at")
+  split      Split
+  tp         Int
+  fp         Int
+  fn         Int
+  tn         Int
+  precision  Float
+  recall     Float
+  f1         Float
+  fpCostNote String   @map("fp_cost_note")
+
+  @@map("eval_metrics")
+}

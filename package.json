@@ -6,21 +6,45 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "ingest": "tsx scripts/01-ingest.ts",
+    "split": "tsx scripts/02-split.ts",
+    "detect": "tsx scripts/03-detect-train.ts",
+    "evaluate": "tsx scripts/04-evaluate.ts",
+    "pipeline": "npm run ingest && npm run split && npm run detect && npm run evaluate"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "@prisma/client": "^5.22.0",
+    "@types/papaparse": "^5.5.2",
+    "d3-force": "^3.0.0",
+    "dotenv": "^17.4.2",
+    "graphology": "^0.26.0",
+    "graphology-communities-louvain": "^2.0.2",
+    "groq-sdk": "^1.6.0",
+    "next": "14.2.35",
+    "papaparse": "^5.7.0",
+    "prisma": "^5.22.0",
     "react": "^18",
     "react-dom": "^18",
-    "next": "14.2.35"
+    "react-force-graph-2d": "^1.29.1",
+    "tsx": "^4.23.12"
   },
   "devDependencies": {
-    "typescript": "^5",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.35",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.35"
+    "typescript": "^5"
+  },
+  "allowScripts": {
+    "@prisma/client@5.22.0": true,
+    "prisma@5.22.0": true,
+    "@prisma/engines@5.22.0": true
   }
 }
