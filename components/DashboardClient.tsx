@@ -8,6 +8,7 @@ import ForceGraphWrapper, {
 } from "@/components/ForceGraphWrapper";
 import ClusterPanel from "@/components/ClusterPanel";
 import MetricsPanel from "@/components/MetricsPanel";
+import AccountLookupBar from "@/components/AccountLookupBar";
 
 interface GraphData {
   nodes: GraphNode[];
@@ -151,6 +152,9 @@ export default function DashboardClient() {
           )}
         </div>
       </header>
+
+      {/* ── Live Account Lookup Bar ────────────────────────────────────────── */}
+      <AccountLookupBar />
 
       {/* ── Main content ─────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">

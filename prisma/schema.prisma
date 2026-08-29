@@ -98,6 +98,7 @@ model ClusterMember {
   account Account @relation(fields: [accountId], references: [id])
 
   @@unique([clusterId, accountId])
+  @@index([accountId])
   @@map("cluster_members")
 }
 
