@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Shield, Users, Zap, CreditCard, MessageSquare, X } from "lucide-react";
+import { AlertTriangle, Shield, Users, Zap, CreditCard, MessageSquare, X, RefreshCw, AlertCircle } from "lucide-react";
 
 interface ClusterData {
   id: number;
@@ -23,7 +23,7 @@ interface ClusterPanelProps {
 
 const tierConfig = {
   HIGH: {
-    label: "HIGH RISK",
+    label: "HIGH RISK CLUSTER",
     bg: "bg-red-500/10",
     border: "border-red-500/30",
     text: "text-red-400",
@@ -31,7 +31,7 @@ const tierConfig = {
     icon: AlertTriangle,
   },
   MEDIUM: {
-    label: "MEDIUM RISK",
+    label: "MEDIUM RISK CLUSTER",
     bg: "bg-amber-500/10",
     border: "border-amber-500/30",
     text: "text-amber-400",
@@ -39,7 +39,7 @@ const tierConfig = {
     icon: AlertTriangle,
   },
   SAFE: {
-    label: "LOW RISK",
+    label: "LOW RISK CLUSTER",
     bg: "bg-emerald-500/10",
     border: "border-emerald-500/30",
     text: "text-emerald-400",
@@ -58,16 +58,18 @@ const densityLabels = {
 export default function ClusterPanel({ cluster, onClose }: ClusterPanelProps) {
   const [explanation, setExplanation] = useState<string | null>(null);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
+  const [errorExplanation, setErrorExplanation] = useState(false);
 
   const tier = tierConfig[cluster.suspicionTier];
   const density = densityLabels[cluster.internalEdgeDensity];
   const TierIcon = tier.icon;
-
   const exposedMerchantCount = cluster.licitMemberCount;
 
   async function fetchExplanation() {
     if (!cluster.isFlagged) return;
     setLoadingExplanation(true);
+    setErrorExplanation(false);
+
     try {
       const res = await fetch("/api/explain", {
         method: "POST",
@@ -75,175 +77,179 @@ export default function ClusterPanel({ cluster, onClose }: ClusterPanelProps) {
         body: JSON.stringify({ clusterId: cluster.id }),
       });
       const data = await res.json();
-      setExplanation(data.explanation ?? "Unable to generate explanation.");
+      if (data.explanation && typeof data.explanation === "string") {
+        setExplanation(data.explanation);
+      } else {
+        setErrorExplanation(true);
+      }
     } catch {
-      setExplanation("Failed to connect to the explanation service.");
+      setErrorExplanation(true);
     } finally {
       setLoadingExplanation(false);
     }
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#0d0e14] border-l border-slate-800">
+    <div className="flex flex-col h-full bg-[#07090e] border-l border-white/10 slide-in-right">
       {/* Header */}
-      <div className={`p-4 border-b border-slate-800 ${tier.bg}`}>
+      <div className={`p-4 border-b border-white/10 ${tier.bg}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${tier.dot} animate-pulse`} />
             <TierIcon size={14} className={tier.text} />
-            <span className={`text-xs font-bold tracking-widest ${tier.text}`}>
+            <span className={`text-[10px] font-bold tracking-widest uppercase ${tier.text}`}>
               {tier.label}
             </span>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-slate-300 transition-colors"
+            className="text-slate-400 hover:text-white transition-colors"
             aria-label="Close cluster panel"
           >
             <X size={16} />
           </button>
         </div>
-        <h2 className="text-white font-semibold mt-2">
+        <h2 className="text-white font-bold text-base mt-2 tracking-tight">
           Cluster #{cluster.communityId}
         </h2>
-        <p className="text-slate-400 text-xs mt-0.5">
-          {cluster.memberCount} accounts in ring structure
+        <p className="text-slate-400 text-xs mt-0.5 font-mono">
+          {cluster.memberCount} total accounts in graph cluster
         </p>
       </div>
 
-      {/* Scrollable content */}
+      {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Structural Evidence */}
         <section>
-          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
             Structural Evidence
           </h3>
-          <div className="space-y-3">
-            {/* Internal connectivity */}
-            <div className="bg-slate-900/60 rounded-lg p-3">
+          <div className="space-y-2.5">
+            {/* Density */}
+            <div className="glass-card rounded-xl p-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-slate-400 text-xs flex items-center gap-1.5">
-                  <Zap size={12} className="text-teal-400" />
-                  Internal Connectivity
+                <span className="text-slate-400 text-xs flex items-center gap-1.5 font-medium">
+                  <Zap size={13} className="text-teal-400" />
+                  Internal Connection Density
                 </span>
-                <span className={`text-xs font-medium ${density.color}`}>
+                <span className={`text-xs font-bold font-mono ${density.color}`}>
                   {density.label}
                 </span>
               </div>
-              <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-slate-900 rounded-full overflow-hidden">
                 <div
                   className={`h-full ${density.color.replace("text-", "bg-")} rounded-full transition-all duration-700 ${density.bar}`}
                 />
               </div>
             </div>
 
-            {/* Time burst */}
-            <div className="bg-slate-900/60 rounded-lg p-3 flex items-center justify-between">
-              <span className="text-slate-400 text-xs flex items-center gap-1.5">
-                <Zap size={12} className="text-teal-400" />
-                Synchronized Bursts
+            {/* Time bursts */}
+            <div className="glass-card rounded-xl p-3 flex items-center justify-between">
+              <span className="text-slate-400 text-xs flex items-center gap-1.5 font-medium">
+                <Zap size={13} className="text-teal-400" />
+                Synchronized Bursts (&lt;1hr)
               </span>
               <span
-                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full font-mono ${
                   cluster.timeBurstPresent
-                    ? "bg-red-500/20 text-red-400"
-                    : "bg-emerald-500/20 text-emerald-400"
+                    ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                    : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                 }`}
               >
-                {cluster.timeBurstPresent ? "DETECTED" : "NOT DETECTED"}
+                {cluster.timeBurstPresent ? "DETECTED" : "NONE"}
               </span>
             </div>
 
-            {/* Payment formats */}
-            <div className="bg-slate-900/60 rounded-lg p-3 flex items-center justify-between">
-              <span className="text-slate-400 text-xs flex items-center gap-1.5">
-                <CreditCard size={12} className="text-teal-400" />
+            {/* Formats */}
+            <div className="glass-card rounded-xl p-3 flex items-center justify-between">
+              <span className="text-slate-400 text-xs flex items-center gap-1.5 font-medium">
+                <CreditCard size={13} className="text-teal-400" />
                 Payment Formats Used
               </span>
-              <span className="text-white text-xs font-medium">
+              <span className="text-white text-xs font-bold font-mono">
                 {cluster.paymentFormatCount}
               </span>
             </div>
 
-            {/* Account breakdown */}
-            <div className="bg-slate-900/60 rounded-lg p-3">
-              <span className="text-slate-400 text-xs flex items-center gap-1.5 mb-2">
-                <Users size={12} className="text-teal-400" />
+            {/* Breakdown */}
+            <div className="glass-card rounded-xl p-3">
+              <span className="text-slate-400 text-xs flex items-center gap-1.5 mb-2 font-medium">
+                <Users size={13} className="text-teal-400" />
                 Account Breakdown
               </span>
-              <div className="flex gap-2 mt-1">
-                <div className="flex-1 text-center bg-red-500/10 rounded p-2">
-                  <div className="text-red-400 font-bold text-lg">
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <div className="text-center bg-red-500/10 border border-red-500/20 rounded-lg p-2">
+                  <div className="text-red-400 font-bold text-base font-mono">
                     {cluster.illicitMemberCount}
                   </div>
-                  <div className="text-slate-500 text-xs">Ring Members</div>
+                  <div className="text-slate-400 text-[10px] uppercase font-semibold">Ring Members</div>
                 </div>
-                <div className="flex-1 text-center bg-amber-500/10 rounded p-2">
-                  <div className="text-amber-400 font-bold text-lg">
+                <div className="text-center bg-amber-500/10 border border-amber-500/20 rounded-lg p-2">
+                  <div className="text-amber-400 font-bold text-base font-mono">
                     {cluster.licitMemberCount}
                   </div>
-                  <div className="text-slate-500 text-xs">Exposed</div>
+                  <div className="text-slate-400 text-[10px] uppercase font-semibold">Exposed Merchants</div>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Protected Merchant Framing */}
+        {/* Merchant Exposure */}
         {cluster.isFlagged && exposedMerchantCount > 0 && (
           <section>
-            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
-              ⚠ Merchant Exposure
+            <h3 className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+              <Shield size={12} /> Merchant Protection Notice
             </h3>
-            <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3">
-              <p className="text-amber-300 text-xs leading-relaxed">
-                <span className="font-semibold">{exposedMerchantCount} legitimate account{exposedMerchantCount !== 1 ? "s" : ""}</span>{" "}
-                transacted directly with members of this ring. Without this flag,
-                each of these accounts would have absorbed chargeback liability
-                when the real cardholder disputed the transaction — after goods
-                were already shipped.
-              </p>
-              <p className="text-slate-500 text-xs mt-2 italic">
-                Accounts shown in amber on the graph. Framing note: IBM AML
-                schema maps accounts → merchants for this analysis.
+            <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-3.5">
+              <p className="text-amber-200 text-xs leading-relaxed">
+                <span className="font-bold text-white">{exposedMerchantCount} legitimate merchant{exposedMerchantCount !== 1 ? "s" : ""}</span>{" "}
+                transacted directly with members of this ring. RingWatch issued proactive warnings before chargebacks land.
               </p>
             </div>
           </section>
         )}
 
-        {/* LLM Explanation */}
+        {/* LLM Explanation Layer */}
         {cluster.isFlagged && (
           <section>
-            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
-              AI Explanation
+            <h3 className="text-[10px] font-bold text-teal-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+              <MessageSquare size={12} /> AI Analysis (Groq Boundary)
             </h3>
-            <div className="bg-slate-900/60 border border-slate-700/50 rounded-lg p-3">
-              <p className="text-slate-500 text-xs mb-3 italic">
-                Plain-English summary generated by Groq LLM from structural
-                evidence only. The LLM does not make fraud determinations —
-                detection is entirely deterministic (graph algorithms).
-              </p>
-              {explanation ? (
-                <p className="text-slate-200 text-sm leading-relaxed">
+            <div className="glass-card rounded-xl p-3.5 border border-slate-700/50">
+              {loadingExplanation && (
+                <div className="space-y-2">
+                  <div className="h-4 bg-slate-800 rounded animate-shimmer w-full" />
+                  <div className="h-4 bg-slate-800 rounded animate-shimmer w-5/6" />
+                  <div className="h-4 bg-slate-800 rounded animate-shimmer w-4/6" />
+                </div>
+              )}
+
+              {!loadingExplanation && explanation && (
+                <p className="text-slate-200 text-xs leading-relaxed font-sans">
                   {explanation}
                 </p>
-              ) : (
+              )}
+
+              {!loadingExplanation && errorExplanation && (
+                <div className="bg-slate-900/90 border border-slate-700 rounded-lg p-3 text-center">
+                  <AlertCircle size={18} className="text-amber-400 mx-auto mb-1.5" />
+                  <p className="text-slate-300 text-xs font-medium mb-2">Explanation unavailable</p>
+                  <button
+                    onClick={fetchExplanation}
+                    className="inline-flex items-center gap-1.5 text-xs text-teal-400 hover:text-teal-300 font-semibold"
+                  >
+                    <RefreshCw size={12} /> Retry Analysis
+                  </button>
+                </div>
+              )}
+
+              {!loadingExplanation && !explanation && !errorExplanation && (
                 <button
                   onClick={fetchExplanation}
-                  disabled={loadingExplanation}
-                  className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 rounded-lg text-teal-400 text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-2.5 px-4 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 rounded-xl text-teal-300 text-xs font-semibold tracking-wide transition-all flex items-center justify-center gap-2"
                 >
-                  {loadingExplanation ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border border-teal-400 border-t-transparent rounded-full animate-spin" />
-                      Generating…
-                    </>
-                  ) : (
-                    <>
-                      <MessageSquare size={14} />
-                      Get Plain-English Explanation
-                    </>
-                  )}
+                  <MessageSquare size={14} /> Generate Plain-English Explanation
                 </button>
               )}
             </div>

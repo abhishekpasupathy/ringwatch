@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Activity, Shield, AlertTriangle, Eye } from "lucide-react";
+import { ShieldCheck, AlertTriangle, Eye, Zap } from "lucide-react";
 import ForceGraphWrapper, {
   GraphNode,
   GraphLink,
@@ -85,68 +85,81 @@ export default function DashboardClient() {
   const exposedCount = graphData?.nodes.filter((n) => n.isExposed).length ?? 0;
 
   return (
-    <div className="flex flex-col h-screen bg-[#0a0b0f] text-white font-sans">
-      {/* ── Top Nav ───────────────────────────────────────────────────────── */}
-      <header className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-slate-800/80 bg-[#0a0b0f]/90 backdrop-blur-sm z-10">
+    <div className="flex flex-col h-screen bg-[#07090e] text-white font-sans overflow-hidden">
+      {/* ── Top Tactical Header & Stat Bar ───────────────────────────────── */}
+      <header className="flex-shrink-0 flex flex-col md:flex-row items-stretch md:items-center justify-between px-6 py-3 border-b border-white/10 bg-[#090d16]/90 backdrop-blur-md z-10 gap-3">
+        {/* Brand Title */}
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-8 h-8 bg-teal-500/20 rounded-lg flex items-center justify-center">
-              <Eye size={16} className="text-teal-400" />
+          <div className="relative flex-shrink-0">
+            <div className="w-9 h-9 bg-teal-500/15 border border-teal-500/30 rounded-xl flex items-center justify-center glow-teal-sm">
+              <Eye size={18} className="text-teal-400" />
             </div>
-            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-teal-400 rounded-full animate-pulse" />
+            <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-teal-400 rounded-full pulse-indicator" />
           </div>
           <div>
-            <h1 className="text-white font-bold text-sm tracking-tight">
-              RingWatch
-            </h1>
-            <p className="text-slate-500 text-xs">
-              Abuse-Ring Sentinel · IBM AML HI-Small
+            <div className="flex items-center gap-2">
+              <h1 className="text-white font-extrabold text-base tracking-tight font-heading">
+                RingWatch
+              </h1>
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-teal-400 bg-teal-500/10 border border-teal-500/25 px-2 py-0.5 rounded-full">
+                Sentinel v1.0
+              </span>
+            </div>
+            <p className="text-slate-400 text-xs font-mono">
+              Abuse-Ring Fraud Sentinel · IBM AML HI-Small
             </p>
           </div>
         </div>
 
-        {/* Summary stats bar */}
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-1.5">
-            <AlertTriangle size={13} className="text-red-400" />
-            <span className="text-red-400 font-semibold text-sm">
-              {flaggedCount}
-            </span>
-            <span className="text-slate-500 text-xs">Rings Detected</span>
+        {/* Top Summary Stat Cards Bar */}
+        <div className="flex items-center gap-2 flex-wrap md:flex-nowrap">
+          {/* Rings Detected */}
+          <div className="glass-card px-3.5 py-1.5 rounded-xl flex items-center gap-2 border-red-500/30">
+            <AlertTriangle size={15} className="text-red-400" />
+            <div>
+              <div className="text-slate-400 text-[9px] font-bold uppercase tracking-wider">Rings Flagged</div>
+              <div className="text-red-400 font-extrabold text-sm font-mono-stat">{flaggedCount}</div>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Activity size={13} className="text-amber-400" />
-            <span className="text-amber-400 font-semibold text-sm">
-              {highRiskCount}
-            </span>
-            <span className="text-slate-500 text-xs">High Risk</span>
+
+          {/* High Risk */}
+          <div className="glass-card px-3.5 py-1.5 rounded-xl flex items-center gap-2 border-amber-500/30">
+            <Zap size={15} className="text-amber-400" />
+            <div>
+              <div className="text-slate-400 text-[9px] font-bold uppercase tracking-wider">High Risk</div>
+              <div className="text-amber-400 font-extrabold text-sm font-mono-stat">{highRiskCount}</div>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Shield size={13} className="text-amber-300" />
-            <span className="text-amber-300 font-semibold text-sm">
-              {exposedCount}
-            </span>
-            <span className="text-slate-500 text-xs">Merchants Protected</span>
+
+          {/* Merchants Protected */}
+          <div className="glass-card px-3.5 py-1.5 rounded-xl flex items-center gap-2 border-teal-500/30">
+            <ShieldCheck size={15} className="text-teal-400" />
+            <div>
+              <div className="text-slate-400 text-[9px] font-bold uppercase tracking-wider">Merchants Protected</div>
+              <div className="text-teal-400 font-extrabold text-sm font-mono-stat">{exposedCount}</div>
+            </div>
           </div>
+
+          {/* Evaluation Stat Pills */}
           {metrics && (
-            <div className="flex items-center gap-3 ml-4 pl-4 border-l border-slate-800">
-              <div className="text-center">
-                <div className="text-teal-400 font-bold text-sm font-mono">
+            <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
+              <div className="glass-card px-2.5 py-1.5 rounded-xl text-center min-w-[55px]">
+                <div className="text-slate-400 text-[9px] font-bold uppercase">Prec</div>
+                <div className="text-teal-400 font-bold text-xs font-mono-stat">
                   {(metrics.precision * 100).toFixed(0)}%
                 </div>
-                <div className="text-slate-600 text-xs">Prec</div>
               </div>
-              <div className="text-center">
-                <div className="text-teal-400 font-bold text-sm font-mono">
+              <div className="glass-card px-2.5 py-1.5 rounded-xl text-center min-w-[55px]">
+                <div className="text-slate-400 text-[9px] font-bold uppercase">Rec</div>
+                <div className="text-teal-400 font-bold text-xs font-mono-stat">
                   {(metrics.recall * 100).toFixed(0)}%
                 </div>
-                <div className="text-slate-600 text-xs">Rec</div>
               </div>
-              <div className="text-center">
-                <div className="text-teal-300 font-bold text-sm font-mono">
+              <div className="glass-card px-2.5 py-1.5 rounded-xl text-center min-w-[55px]">
+                <div className="text-slate-400 text-[9px] font-bold uppercase">F1</div>
+                <div className="text-teal-300 font-bold text-xs font-mono-stat">
                   {(metrics.f1 * 100).toFixed(0)}%
                 </div>
-                <div className="text-slate-600 text-xs">F1</div>
               </div>
             </div>
           )}
@@ -156,75 +169,69 @@ export default function DashboardClient() {
       {/* ── Live Account Lookup Bar ────────────────────────────────────────── */}
       <AccountLookupBar />
 
-      {/* ── Main content ─────────────────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left: Graph or Metrics panel (tabs on mobile, side-by-side desktop) */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Force Graph */}
-          <div className="flex-1 relative">
-            {graphLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-[#0a0b0f]">
-                <div className="text-center">
-                  <div className="w-10 h-10 border-2 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                  <p className="text-slate-400 text-sm">Loading transaction graph…</p>
-                </div>
+      {/* ── Main Dashboard Workspace ───────────────────────────────────────── */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Force Graph Visualization */}
+        <div className="flex-1 relative bg-[#07090e]">
+          {graphLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-[#07090e] z-20">
+              <div className="text-center">
+                <div className="w-10 h-10 border-2 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto mb-3 glow-teal-sm" />
+                <p className="text-slate-400 text-xs font-mono tracking-wider">LOADING GRAPH ENGINE…</p>
               </div>
-            )}
+            </div>
+          )}
 
-            {graphError && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center max-w-sm">
-                  <AlertTriangle className="text-amber-400 mx-auto mb-3" size={32} />
-                  <p className="text-slate-300 font-medium mb-2">No Graph Data</p>
-                  <p className="text-slate-500 text-sm">{graphError}</p>
-                  <p className="text-slate-600 text-xs mt-3">
-                    Run the ingestion + evaluation scripts, then reload.
-                  </p>
-                </div>
+          {graphError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-[#07090e] z-20">
+              <div className="text-center max-w-sm glass-panel p-6 rounded-2xl border border-slate-800">
+                <AlertTriangle className="text-amber-400 mx-auto mb-3" size={32} />
+                <p className="text-slate-200 font-bold mb-1">Graph Data Unavailable</p>
+                <p className="text-slate-400 text-xs leading-relaxed">{graphError}</p>
               </div>
-            )}
+            </div>
+          )}
 
-            {graphData && !graphLoading && (
-              <>
-                {/* Legend */}
-                <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5 bg-[#0d0e14]/90 backdrop-blur-sm border border-slate-800 rounded-lg p-3">
-                  <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1">
-                    Legend
-                  </p>
-                  {[
-                    { color: "bg-red-500", label: "Ring Member (Illicit)" },
-                    { color: "bg-amber-500", label: "Exposed Merchant (Licit)" },
-                    { color: "bg-blue-500", label: "Safe Account" },
-                  ].map(({ color, label }) => (
-                    <div key={label} className="flex items-center gap-2">
-                      <div className={`w-2.5 h-2.5 rounded-full ${color}`} />
-                      <span className="text-slate-400 text-xs">{label}</span>
-                    </div>
-                  ))}
-                  <p className="text-slate-600 text-xs mt-1 italic">
-                    Click a node to inspect
-                  </p>
-                </div>
+          {graphData && !graphLoading && (
+            <>
+              {/* Tactical Legend Overlay */}
+              <div className="absolute top-4 left-4 z-10 glass-panel border border-white/10 rounded-xl p-3 shadow-2xl space-y-2">
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                  Live Network Legend
+                </p>
+                {[
+                  { color: "bg-red-500 glow-red-sm", label: "Ring Member (Illicit)" },
+                  { color: "bg-amber-500 glow-amber-sm", label: "Exposed Merchant (Licit)" },
+                  { color: "bg-blue-500 glow-teal-sm", label: "Safe Account" },
+                ].map(({ color, label }) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <div className={`w-2.5 h-2.5 rounded-full ${color}`} />
+                    <span className="text-slate-300 text-xs font-medium">{label}</span>
+                  </div>
+                ))}
+                <p className="text-slate-400 text-[10px] pt-1 border-t border-white/5 italic">
+                  Hover node to highlight edges
+                </p>
+              </div>
 
-                <ForceGraphWrapper
-                  nodes={graphData.nodes}
-                  links={graphData.links}
-                  onNodeClick={handleNodeClick}
-                  selectedClusterId={selectedCluster?.id}
-                />
-              </>
-            )}
-          </div>
-
-          {/* Right: Metrics panel (always visible, fixed width) */}
-          <div className="w-80 border-l border-slate-800 overflow-y-auto flex-shrink-0">
-            <MetricsPanel metrics={metrics} loading={metricsLoading} />
-          </div>
+              <ForceGraphWrapper
+                nodes={graphData.nodes}
+                links={graphData.links}
+                onNodeClick={handleNodeClick}
+                selectedClusterId={selectedCluster?.id}
+              />
+            </>
+          )}
         </div>
 
-        {/* Cluster detail panel (slides in on node click) */}
+        {/* Right: Metrics Panel */}
+        <div className="w-80 border-l border-white/10 bg-[#090d16]/95 flex-shrink-0 overflow-hidden">
+          <MetricsPanel metrics={metrics} loading={metricsLoading} />
+        </div>
+
+        {/* Cluster Detail Panel (slides in on node click) */}
         {selectedCluster && (
-          <div className="w-72 flex-shrink-0 border-l border-slate-800 overflow-hidden">
+          <div className="w-80 flex-shrink-0 border-l border-white/10 z-20">
             <ClusterPanel
               cluster={selectedCluster}
               onClose={() => setSelectedCluster(null)}

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, Info, BarChart2, ShieldAlert } from "lucide-react";
 
 interface MetricsPanelProps {
   metrics: {
@@ -29,13 +29,15 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 text-center">
-      <div className={`text-3xl font-bold font-mono ${color}`}>{value}</div>
-      <div className="text-slate-400 text-xs font-medium mt-1 uppercase tracking-wider">
+    <div className="glass-card rounded-xl p-3.5 text-center border border-white/5 relative overflow-hidden">
+      <div className="text-slate-400 text-[10px] font-semibold uppercase tracking-wider mb-1">
         {label}
       </div>
+      <div className={`text-2xl font-bold font-mono-stat ${color}`}>
+        {value}
+      </div>
       {subtitle && (
-        <div className="text-slate-600 text-xs mt-0.5">{subtitle}</div>
+        <div className="text-slate-500 text-[10px] mt-0.5">{subtitle}</div>
       )}
     </div>
   );
@@ -53,12 +55,12 @@ function ConfusionCell({
   description: string;
 }) {
   return (
-    <div className={`rounded-lg p-3 border ${color} text-center`}>
-      <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">
+    <div className={`rounded-xl p-3 border ${color} text-center`}>
+      <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
         {label}
       </div>
-      <div className="text-2xl font-bold font-mono text-white">{value}</div>
-      <div className="text-xs text-slate-600 mt-1">{description}</div>
+      <div className="text-xl font-bold font-mono-stat text-white">{value}</div>
+      <div className="text-[10px] text-slate-400 mt-0.5">{description}</div>
     </div>
   );
 }
@@ -66,55 +68,53 @@ function ConfusionCell({
 export default function MetricsPanel({ metrics, loading }: MetricsPanelProps) {
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="flex items-center gap-2 mb-6">
-          <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-          <h2 className="text-slate-300 font-semibold uppercase tracking-wider text-xs">
-            Detection Metrics
-          </h2>
-        </div>
-        <div className="space-y-3">
+      <div className="p-5 space-y-4">
+        <div className="h-4 w-32 bg-slate-800 rounded animate-shimmer" />
+        <div className="grid grid-cols-3 gap-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-20 bg-slate-900/60 rounded-xl animate-pulse" />
+            <div key={i} className="h-16 bg-slate-800/60 rounded-xl animate-shimmer" />
           ))}
         </div>
+        <div className="h-32 bg-slate-800/40 rounded-xl animate-shimmer" />
       </div>
     );
   }
 
   if (!metrics) {
     return (
-      <div className="p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <AlertTriangle size={14} className="text-amber-400" />
-          <span className="text-amber-400 text-xs font-medium">
-            No metrics available
+      <div className="p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle size={15} className="text-amber-400" />
+          <span className="text-amber-400 text-xs font-semibold uppercase tracking-wider">
+            No Evaluation Metrics
           </span>
         </div>
-        <p className="text-slate-500 text-xs leading-relaxed">
-          Run the evaluation scripts to generate metrics:
+        <p className="text-slate-400 text-xs leading-relaxed">
+          Run evaluation scripts to calculate held-out test metrics:
         </p>
-        <pre className="mt-2 text-xs text-teal-400 bg-slate-900 rounded p-2 overflow-x-auto">
-          {`npx tsx scripts/04-evaluate.ts`}
+        <pre className="mt-3 text-xs text-teal-400 bg-[#07090e] border border-slate-800 rounded-lg p-2.5 font-mono">
+          npm run evaluate
         </pre>
       </div>
     );
   }
 
   return (
-    <div className="p-5 space-y-5 overflow-y-auto">
+    <div className="p-5 space-y-5 overflow-y-auto h-full">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between border-b border-white/5 pb-3">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-teal-400" />
-          <h2 className="text-slate-300 font-semibold uppercase tracking-wider text-xs">
-            Detection Metrics
+          <BarChart2 size={15} className="text-teal-400" />
+          <h2 className="text-slate-200 font-bold text-xs uppercase tracking-wider">
+            Test Set Evaluation
           </h2>
         </div>
-        <span className="text-slate-600 text-xs">Held-out TEST set</span>
+        <span className="text-[10px] text-teal-400 font-mono bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded-full">
+          20% Temporal Holdout
+        </span>
       </div>
 
-      {/* Primary Metrics */}
+      {/* Primary Stat Cards */}
       <div className="grid grid-cols-3 gap-2">
         <StatCard
           label="Precision"
@@ -133,73 +133,61 @@ export default function MetricsPanel({ metrics, loading }: MetricsPanelProps) {
         />
       </div>
 
-      {/* Louvain variance note */}
-      <div className="flex items-start gap-2 bg-slate-900/40 rounded-lg p-2.5 border border-slate-800">
-        <Info size={12} className="text-slate-500 mt-0.5 flex-shrink-0" />
-        <p className="text-slate-500 text-xs leading-relaxed">
-          Louvain algorithm variance: ±1–2% across runs.{" "}
-          <span className="text-slate-600">
-            See eval-report.md for details.
-          </span>
+      {/* Algorithm Variance Note */}
+      <div className="flex items-start gap-2 bg-[#090d16] rounded-xl p-3 border border-slate-800/80">
+        <Info size={14} className="text-slate-400 mt-0.5 flex-shrink-0" />
+        <p className="text-slate-400 text-[11px] leading-relaxed">
+          <span className="font-semibold text-slate-300">Louvain Variance:</span> ±1–2% across runs on this dataset. See <code className="text-teal-400 font-mono">eval-report.md</code> for details.
         </p>
       </div>
 
-      {/* Confusion Matrix */}
-      <div>
-        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">
-          Confusion Matrix
+      {/* Confusion Matrix Grid */}
+      <section>
+        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">
+          Confusion Matrix (Account Level)
         </h3>
         <div className="grid grid-cols-2 gap-2">
           <ConfusionCell
-            label="TP"
+            label="True Positive"
             value={metrics.tp}
             color="border-teal-500/30 bg-teal-500/5"
-            description="Correctly flagged"
+            description="Correctly flagged ring"
           />
           <ConfusionCell
-            label="FP"
+            label="False Positive"
             value={metrics.fp}
             color="border-amber-500/30 bg-amber-500/5"
-            description="False alarm"
+            description="Licit account hold"
           />
           <ConfusionCell
-            label="FN"
+            label="False Negative"
             value={metrics.fn}
             color="border-red-500/30 bg-red-500/5"
-            description="Missed ring"
+            description="Missed ring member"
           />
           <ConfusionCell
-            label="TN"
+            label="True Negative"
             value={metrics.tn}
-            color="border-slate-700 bg-slate-900/60"
+            color="border-slate-800 bg-slate-900/60"
             description="Correctly safe"
           />
         </div>
-      </div>
+      </section>
 
-      {/* False-Positive Cost */}
-      <div>
-        <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">
-          False-Positive Cost
-        </h3>
-        <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3">
-          <p className="text-amber-200/80 text-xs leading-relaxed">
+      {/* False-Positive Cost Narrative */}
+      <section>
+        <div className="flex items-center gap-1.5 mb-2">
+          <ShieldAlert size={13} className="text-amber-400" />
+          <h3 className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+            False-Positive Cost Analysis
+          </h3>
+        </div>
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3.5">
+          <p className="text-amber-200/90 text-[11px] leading-relaxed">
             {metrics.fpCostNote}
           </p>
         </div>
-      </div>
-
-      {/* Computed timestamp */}
-      <p className="text-slate-700 text-xs text-right">
-        Computed:{" "}
-        {new Date(metrics.computedAt).toLocaleDateString("en-IN", {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
-      </p>
+      </section>
     </div>
   );
 }
