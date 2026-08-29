@@ -127,3 +127,29 @@ h1, h2, h3, h4 {
   background-size: 200% 100%;
   animation: shimmer 1.8s infinite;
 }
+
+/* Panel slide-in animation */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.slide-in-right {
+  animation: slide-in-right 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Ring member node pulse (canvas uses JS; this is for legend dot) */
+@keyframes ring-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.8); }
+}
+
+.ring-pulse-dot {
+  animation: ring-pulse 2s ease-in-out infinite;
+}

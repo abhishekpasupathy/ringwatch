@@ -37,7 +37,11 @@ const DEMO_CHIPS = [
   { id: "300_1000", label: "Safe Account", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/20 shadow-sm shadow-emerald-500/10" },
 ];
 
-export default function AccountLookupBar() {
+interface AccountLookupBarProps {
+  onAccountFocus?: (accountId: string) => void;
+}
+
+export default function AccountLookupBar({ onAccountFocus }: AccountLookupBarProps) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<LookupResult | null>(null);
@@ -53,6 +57,10 @@ export default function AccountLookupBar() {
       const res = await fetch(`/api/lookup?account_id=${encodeURIComponent(searchId)}`);
       const data = await res.json();
       setResult(data);
+      // Focus graph and open inspector panel when account is found in graph
+      if (data.found && onAccountFocus) {
+        onAccountFocus(searchId);
+      }
     } catch {
       setResult({
         found: false,

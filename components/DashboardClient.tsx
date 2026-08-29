@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { ShieldCheck, AlertTriangle, Eye, Zap } from "lucide-react";
 import ForceGraphWrapper, {
   GraphNode,
   GraphLink,
+  ForceGraphHandle,
 } from "@/components/ForceGraphWrapper";
-import ClusterPanel from "@/components/ClusterPanel";
+import NodeInspectorPanel from "@/components/NodeInspectorPanel";
 import MetricsPanel from "@/components/MetricsPanel";
 import AccountLookupBar from "@/components/AccountLookupBar";
 
@@ -44,12 +45,11 @@ interface MetricsData {
 export default function DashboardClient() {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [metrics, setMetrics] = useState<MetricsData | null>(null);
-  const [selectedCluster, setSelectedCluster] = useState<ClusterData | null>(
-    null
-  );
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [graphError, setGraphError] = useState<string | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(true);
   const [graphLoading, setGraphLoading] = useState(true);
+  const graphRef = useRef<ForceGraphHandle>(null);
 
   useEffect(() => {
     fetch("/api/graph")
@@ -74,10 +74,21 @@ export default function DashboardClient() {
   }, []);
 
   function handleNodeClick(node: GraphNode) {
-    if (!graphData) return;
-    const cluster = graphData.clusters.find((c) => c.id === node.clusterId);
-    if (cluster) setSelectedCluster(cluster);
+    setSelectedNode(node);
   }
+
+  const handleAccountFocus = useCallback(
+    (accountId: string) => {
+      if (!graphData) return;
+      const node = graphData.nodes.find((n) => n.id === accountId);
+      if (node) {
+        setSelectedNode(node);
+        // Small delay to ensure graph ref is ready after layout
+        setTimeout(() => graphRef.current?.focusNode(accountId), 100);
+      }
+    },
+    [graphData]
+  );
 
   const flaggedCount = graphData?.clusters.filter((c) => c.isFlagged).length ?? 0;
   const highRiskCount =
@@ -167,12 +178,12 @@ export default function DashboardClient() {
       </header>
 
       {/* ── Live Account Lookup Bar ────────────────────────────────────────── */}
-      <AccountLookupBar />
+      <AccountLookupBar onAccountFocus={handleAccountFocus} />
 
       {/* ── Main Dashboard Workspace ───────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden relative">
         {/* Force Graph Visualization */}
-        <div className="flex-1 relative bg-[#07090e]">
+        <div className="flex-1 relative bg-[#07090e] min-w-0">
           {graphLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-[#07090e] z-20">
               <div className="text-center">
@@ -200,7 +211,7 @@ export default function DashboardClient() {
                   Live Network Legend
                 </p>
                 {[
-                  { color: "bg-red-500 glow-red-sm", label: "Ring Member (Illicit)" },
+                  { color: "bg-red-500 glow-red-sm ring-pulse-dot", label: "Ring Member (Illicit)" },
                   { color: "bg-amber-500 glow-amber-sm", label: "Exposed Merchant (Licit)" },
                   { color: "bg-blue-500 glow-teal-sm", label: "Safe Account" },
                 ].map(({ color, label }) => (
@@ -210,34 +221,35 @@ export default function DashboardClient() {
                   </div>
                 ))}
                 <p className="text-slate-400 text-[10px] pt-1 border-t border-white/5 italic">
-                  Hover node to highlight edges
+                  Hover to preview · Click to inspect
                 </p>
               </div>
 
               <ForceGraphWrapper
+                ref={graphRef}
                 nodes={graphData.nodes}
                 links={graphData.links}
                 onNodeClick={handleNodeClick}
-                selectedClusterId={selectedCluster?.id}
+                selectedNodeId={selectedNode?.id}
               />
             </>
           )}
         </div>
 
+        {/* Node Inspector Panel (slides in on node click) */}
+        {selectedNode && (
+          <div className="w-80 flex-shrink-0 border-l border-white/10 z-20 overflow-hidden">
+            <NodeInspectorPanel
+              node={selectedNode}
+              onClose={() => setSelectedNode(null)}
+            />
+          </div>
+        )}
+
         {/* Right: Metrics Panel */}
         <div className="w-80 border-l border-white/10 bg-[#090d16]/95 flex-shrink-0 overflow-hidden">
           <MetricsPanel metrics={metrics} loading={metricsLoading} />
         </div>
-
-        {/* Cluster Detail Panel (slides in on node click) */}
-        {selectedCluster && (
-          <div className="w-80 flex-shrink-0 border-l border-white/10 z-20">
-            <ClusterPanel
-              cluster={selectedCluster}
-              onClose={() => setSelectedCluster(null)}
-            />
-          </div>
-        )}
       </div>
     </div>
   );
