@@ -32,9 +32,9 @@ interface LookupResult {
 }
 
 const DEMO_CHIPS = [
-  { id: "101_20", label: "Ring Member", color: "bg-red-500/10 text-red-400 border-red-500/40 hover:bg-red-500/20 shadow-sm shadow-red-500/10" },
-  { id: "201_500", label: "Exposed Merchant", color: "bg-amber-500/10 text-amber-400 border-amber-500/40 hover:bg-amber-500/20 shadow-sm shadow-amber-500/10" },
-  { id: "300_1000", label: "Safe Account", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/20 shadow-sm shadow-emerald-500/10" },
+  { id: "PASTE_RING_MEMBER_ID_HERE", label: "Ring Member", color: "bg-red-500/10 text-red-400 border-red-500/40 hover:bg-red-500/20 shadow-sm shadow-red-500/10" },
+  { id: "PASTE_EXPOSED_MERCHANT_ID_HERE", label: "Exposed Merchant", color: "bg-amber-500/10 text-amber-400 border-amber-500/40 hover:bg-amber-500/20 shadow-sm shadow-amber-500/10" },
+  { id: "PASTE_SAFE_ACCOUNT_ID_HERE", label: "Safe Account", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/20 shadow-sm shadow-emerald-500/10" },
 ];
 
 interface AccountLookupBarProps {
