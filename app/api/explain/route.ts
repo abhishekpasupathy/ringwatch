@@ -25,7 +25,7 @@ import {
   toSuspicionTier,
   StructuralEvidence,
 } from "@/lib/llm-boundary";
-import { neon } from "@neondatabase/serverless";
+import prisma from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     if (!process.env.DATABASE_URL) {
       return NextResponse.json({ error: "DATABASE_URL not configured" }, { status: 500 });
     }
-    const sql = neon(process.env.DATABASE_URL);
+
     const body = await req.json();
     const { clusterId } = body;
 
@@ -46,55 +46,40 @@ export async function POST(req: NextRequest) {
     }
 
     // Load cluster structural data from DB
-    const clusters = await sql`
-      SELECT
-        is_flagged,
-        suspicion_score,
-        internal_edge_ratio,
-        time_burst_fraction,
-        payment_format_count,
-        member_count
-      FROM clusters
-      WHERE id = ${clusterId}
-      LIMIT 1
-    `;
+    const cluster = await prisma.cluster.findUnique({
+      where: { id: clusterId },
+    });
 
-    if (clusters.length === 0) {
+    if (!cluster) {
       return NextResponse.json({ error: "Cluster not found" }, { status: 404 });
     }
 
-    const c = clusters[0];
-
-    if (!c.is_flagged) {
+    if (!cluster.isFlagged) {
       return NextResponse.json(
         { error: "Explanations are only available for flagged clusters" },
         { status: 400 }
       );
     }
 
-    // Get the threshold from the most recent TRAIN run (to derive tier)
-    const trainRuns = await sql`
-      SELECT threshold FROM detection_runs
-      WHERE split = 'TEST'
-      ORDER BY run_at DESC
-      LIMIT 1
-    `;
-    const threshold = trainRuns[0]?.threshold ?? 0.5;
+    // Get the threshold from the most recent TRAIN run
+    const trainRun = await prisma.detectionRun.findFirst({
+      where: { split: "TEST" },
+      orderBy: { runAt: "desc" },
+      select: { threshold: true },
+    });
+
+    const threshold = trainRun?.threshold ?? 0.5;
 
     // Build the structural evidence object
-    // CRITICAL: raw numeric scores and threshold are NOT included
     const evidence: StructuralEvidence = {
-      clusterSize: c.member_count,
-      internalEdgeDensity: toDensityLabel(parseFloat(String(c.internal_edge_ratio))),
-      timeBurstPresent: parseFloat(String(c.time_burst_fraction)) > 0.3,
-      paymentFormatCount: c.payment_format_count,
-      suspicionTier: toSuspicionTier(
-        parseFloat(String(c.suspicion_score)),
-        parseFloat(String(threshold))
-      ),
+      clusterSize: cluster.memberCount,
+      internalEdgeDensity: toDensityLabel(cluster.internalEdgeRatio),
+      timeBurstPresent: cluster.timeBurstFraction > 0.3,
+      paymentFormatCount: cluster.paymentFormatCount,
+      suspicionTier: toSuspicionTier(cluster.suspicionScore, threshold),
     };
 
-    // Call Groq via the LLM boundary (validates no forbidden fields)
+    // Call Groq via the LLM boundary
     const explanation = await explainCluster(evidence);
 
     return NextResponse.json({ explanation });

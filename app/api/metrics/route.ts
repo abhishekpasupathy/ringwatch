@@ -9,7 +9,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { neon } from "@neondatabase/serverless";
+import prisma from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -18,37 +18,29 @@ export async function GET() {
     if (!process.env.DATABASE_URL) {
       return NextResponse.json({ error: "DATABASE_URL not configured" }, { status: 500 });
     }
-    const sql = neon(process.env.DATABASE_URL);
-    const metrics = await sql`
-      SELECT
-        tp, fp, fn, tn,
-        precision, recall, f1,
-        fp_cost_note,
-        run_at
-      FROM eval_metrics
-      WHERE split = 'TEST'
-      ORDER BY run_at DESC
-      LIMIT 1
-    `;
 
-    if (metrics.length === 0) {
+    const m = await prisma.evalMetrics.findFirst({
+      where: { split: "TEST" },
+      orderBy: { runAt: "desc" },
+    });
+
+    if (!m) {
       return NextResponse.json(
         { error: "No evaluation metrics found. Run scripts/04-evaluate.ts first." },
         { status: 404 }
       );
     }
 
-    const m = metrics[0];
     return NextResponse.json({
       tp: m.tp,
       fp: m.fp,
       fn: m.fn,
       tn: m.tn,
-      precision: parseFloat(m.precision),
-      recall: parseFloat(m.recall),
-      f1: parseFloat(m.f1),
-      fpCostNote: m.fp_cost_note,
-      computedAt: m.run_at,
+      precision: m.precision,
+      recall: m.recall,
+      f1: m.f1,
+      fpCostNote: m.fpCostNote,
+      computedAt: m.runAt,
     });
   } catch (err) {
     console.error("/api/metrics error:", err);

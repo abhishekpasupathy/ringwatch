@@ -21,7 +21,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { neon } from "@neondatabase/serverless";
+import prisma from "@/lib/db";
 import { toDensityLabel } from "@/lib/llm-boundary";
 
 export const dynamic = "force-dynamic";
@@ -34,81 +34,43 @@ export async function GET() {
     if (!process.env.DATABASE_URL) {
       return NextResponse.json({ error: "DATABASE_URL not configured" }, { status: 500 });
     }
-    const sql = neon(process.env.DATABASE_URL);
-    // Get most recent TEST detection run
-    const runs = await sql`
-      SELECT id, modularity_score
-      FROM detection_runs
-      WHERE split = 'TEST'
-      ORDER BY run_at DESC
-      LIMIT 1
-    `;
 
-    if (runs.length === 0) {
+    // Get most recent TEST detection run
+    const run = await prisma.detectionRun.findFirst({
+      where: { split: "TEST" },
+      orderBy: { runAt: "desc" },
+      select: { id: true, modularityScore: true },
+    });
+
+    if (!run) {
       return NextResponse.json(
         { error: "No detection run found. Run the evaluation scripts first." },
         { status: 404 }
       );
     }
 
-    const runId = runs[0].id;
+    // Get flagged clusters
+    const clusters = await prisma.cluster.findMany({
+      where: { runId: run.id },
+      orderBy: { suspicionScore: "desc" },
+      take: 100,
+    });
 
-    // Get flagged clusters (sorted by suspicion score descending)
-    const clusters = await sql`
-      SELECT
-        c.id,
-        c.community_id,
-        c.is_flagged,
-        c.suspicion_score,
-        c.internal_edge_ratio,
-        c.time_burst_fraction,
-        c.payment_format_count,
-        c.member_count,
-        c.illicit_member_count,
-        c.licit_member_count
-      FROM clusters c
-      WHERE c.run_id = ${runId}
-      ORDER BY c.suspicion_score DESC
-      LIMIT 100
-    `;
-
-    interface ClusterRow {
-      id: number;
-      community_id: number;
-      is_flagged: boolean;
-      suspicion_score: number | string;
-      internal_edge_ratio: number | string;
-      time_burst_fraction: number | string;
-      payment_format_count: number;
-      member_count: number;
-      illicit_member_count: number;
-      licit_member_count: number;
-    }
-
-    interface EdgeRow {
-      source: string;
-      target: string;
-    }
-
-    const clusterRows = clusters as unknown as ClusterRow[];
-    const clusterIds = clusterRows.map((c) => c.id);
+    const clusterIds = clusters.map((c) => c.id);
     if (clusterIds.length === 0) {
       return NextResponse.json({ nodes: [], links: [], clusters: [] });
     }
 
-    const members = await sql`
-      SELECT
-        cm.account_id,
-        cm.cluster_id,
-        cm.is_illicit,
-        cm.is_exposed,
-        c.is_flagged,
-        c.suspicion_score
-      FROM cluster_members cm
-      JOIN clusters c ON c.id = cm.cluster_id
-      WHERE cm.cluster_id = ANY(${clusterIds})
-      LIMIT ${MAX_NODES}
-    `;
+    // Get cluster members
+    const members = await prisma.clusterMember.findMany({
+      where: { clusterId: { in: clusterIds } },
+      take: MAX_NODES,
+      include: {
+        cluster: {
+          select: { isFlagged: true, suspicionScore: true },
+        },
+      },
+    });
 
     // Build node map
     const nodeMap = new Map<
@@ -124,69 +86,65 @@ export async function GET() {
     >();
 
     for (const m of members) {
-      const score = parseFloat(m.suspicion_score);
-      // Tier derivation — numeric score is NOT sent to client
-      const suspicionTier = !m.is_flagged
+      const score = m.cluster.suspicionScore;
+      const suspicionTier = !m.cluster.isFlagged
         ? "SAFE"
         : score > 0.65
         ? "HIGH"
         : "MEDIUM";
 
-      nodeMap.set(m.account_id, {
-        id: m.account_id,
-        isIllicit: m.is_illicit,
-        isExposed: m.is_exposed,
-        clusterId: m.cluster_id,
-        isFlagged: m.is_flagged,
+      nodeMap.set(m.accountId, {
+        id: m.accountId,
+        isIllicit: m.isIllicit,
+        isExposed: m.isExposed,
+        clusterId: m.clusterId,
+        isFlagged: m.cluster.isFlagged,
         suspicionTier,
       });
     }
 
-    // Fetch representative edges between these nodes (from transactions)
-    // Limit to 1000 edges for browser performance
+    // Fetch representative edges between these nodes
     const nodeIds = Array.from(nodeMap.keys());
-    const edges =
-      nodeIds.length > 1
-        ? await sql`
-          SELECT DISTINCT
-            from_account_id AS source,
-            to_account_id AS target
-          FROM transactions
-          WHERE
-            from_account_id = ANY(${nodeIds})
-            AND to_account_id = ANY(${nodeIds})
-            AND split = 'TEST'
-          LIMIT 1000
-        `
-        : [];
+    const transactions = nodeIds.length > 1
+      ? await prisma.transaction.findMany({
+          where: {
+            fromAccountId: { in: nodeIds },
+            toAccountId: { in: nodeIds },
+            split: "TEST",
+          },
+          select: { fromAccountId: true, toAccountId: true },
+          take: 1000,
+        })
+      : [];
 
-    // Format cluster response (no raw suspicion scores exposed)
-    const clusterResponse = clusterRows.map((c) => {
-      const score = parseFloat(String(c.suspicion_score));
-      return {
-        id: c.id,
-        communityId: c.community_id,
-        isFlagged: c.is_flagged,
-        // suspicionTier only — not the raw score
-        suspicionTier: !c.is_flagged ? "SAFE" : score > 0.65 ? "HIGH" : "MEDIUM",
-        memberCount: c.member_count,
-        illicitMemberCount: c.illicit_member_count,
-        licitMemberCount: c.licit_member_count,
-        // Qualitative density label — not the raw ratio
-        internalEdgeDensity: toDensityLabel(parseFloat(String(c.internal_edge_ratio))),
-        timeBurstPresent: parseFloat(String(c.time_burst_fraction)) > 0.3,
-        paymentFormatCount: c.payment_format_count,
-      };
-    });
+    // Deduplicate links
+    const linkSet = new Set<string>();
+    const links: { source: string; target: string }[] = [];
+    for (const t of transactions) {
+      const key = `${t.fromAccountId}|||${t.toAccountId}`;
+      if (!linkSet.has(key)) {
+        linkSet.add(key);
+        links.push({ source: t.fromAccountId, target: t.toAccountId });
+      }
+    }
 
-    const edgeRows = edges as unknown as EdgeRow[];
+    // Format cluster response
+    const clusterResponse = clusters.map((c) => ({
+      id: c.id,
+      communityId: c.communityId,
+      isFlagged: c.isFlagged,
+      suspicionTier: !c.isFlagged ? "SAFE" : c.suspicionScore > 0.65 ? "HIGH" : "MEDIUM",
+      memberCount: c.memberCount,
+      illicitMemberCount: c.illicitMemberCount,
+      licitMemberCount: c.licitMemberCount,
+      internalEdgeDensity: toDensityLabel(c.internalEdgeRatio),
+      timeBurstPresent: c.timeBurstFraction > 0.3,
+      paymentFormatCount: c.paymentFormatCount,
+    }));
 
     return NextResponse.json({
       nodes: Array.from(nodeMap.values()),
-      links: edgeRows.map((e) => ({
-        source: e.source,
-        target: e.target,
-      })),
+      links,
       clusters: clusterResponse,
     });
   } catch (err) {
