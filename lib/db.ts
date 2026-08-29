@@ -21,7 +21,12 @@ export const prisma =
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
-// Neon serverless SQL for API routes (edge-compatible)
-export const sql = neon(process.env.DATABASE_URL!);
+// Neon serverless SQL helper function
+export function getSql() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL environment variable is missing.");
+  }
+  return neon(process.env.DATABASE_URL);
+}
 
 export default prisma;

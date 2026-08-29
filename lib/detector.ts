@@ -171,8 +171,7 @@ export function sweepThreshold(
   for (const t of thresholds) {
     let tp = 0,
       fp = 0,
-      fn = 0,
-      tn = 0;
+      fn = 0;
 
     for (const comm of communities) {
       const flagged = comm.suspicionScore >= t;
@@ -181,7 +180,6 @@ export function sweepThreshold(
         if (flagged && isIllicit) tp++;
         else if (flagged && !isIllicit) fp++;
         else if (!flagged && isIllicit) fn++;
-        else tn++;
       }
     }
 

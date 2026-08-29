@@ -90,6 +90,7 @@ export default function ClusterPanel({ cluster, onClose }: ClusterPanelProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${tier.dot} animate-pulse`} />
+            <TierIcon size={14} className={tier.text} />
             <span className={`text-xs font-bold tracking-widest ${tier.text}`}>
               {tier.label}
             </span>

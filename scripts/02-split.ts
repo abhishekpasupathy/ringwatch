@@ -62,7 +62,7 @@ async function main() {
 
   // Batch update using cursor pagination
   while (true) {
-    const batch = await prisma.transaction.findMany({
+    const batch: { id: number }[] = await prisma.transaction.findMany({
       where: {
         timestamp: { gt: cutoffTimestamp },
         ...(cursor !== undefined ? { id: { gt: cursor } } : {}),
@@ -74,7 +74,7 @@ async function main() {
 
     if (batch.length === 0) break;
 
-    const ids = batch.map((r) => r.id);
+    const ids: number[] = batch.map((r: { id: number }) => r.id);
     await prisma.transaction.updateMany({
       where: { id: { in: ids } },
       data: { split: "TEST" },

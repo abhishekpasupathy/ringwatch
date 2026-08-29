@@ -49,7 +49,6 @@ export default function DashboardClient() {
   const [graphError, setGraphError] = useState<string | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(true);
   const [graphLoading, setGraphLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"graph" | "metrics">("graph");
 
   useEffect(() => {
     fetch("/api/graph")

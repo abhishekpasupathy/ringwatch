@@ -11,10 +11,14 @@
 import { NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 
-const sql = neon(process.env.DATABASE_URL!);
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json({ error: "DATABASE_URL not configured" }, { status: 500 });
+    }
+    const sql = neon(process.env.DATABASE_URL);
     const metrics = await sql`
       SELECT
         tp, fp, fn, tn,

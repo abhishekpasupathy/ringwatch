@@ -24,13 +24,17 @@ import { NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { toDensityLabel } from "@/lib/llm-boundary";
 
-const sql = neon(process.env.DATABASE_URL!);
+export const dynamic = "force-dynamic";
 
 // Maximum nodes to return (keeps the force graph performant in browser)
 const MAX_NODES = 500;
 
 export async function GET() {
   try {
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json({ error: "DATABASE_URL not configured" }, { status: 500 });
+    }
+    const sql = neon(process.env.DATABASE_URL);
     // Get most recent TEST detection run
     const runs = await sql`
       SELECT id, modularity_score
@@ -68,8 +72,26 @@ export async function GET() {
       LIMIT 100
     `;
 
-    // Get cluster members (capped at MAX_NODES for browser performance)
-    const clusterIds = clusters.map((c: { id: number }) => c.id);
+    interface ClusterRow {
+      id: number;
+      community_id: number;
+      is_flagged: boolean;
+      suspicion_score: number | string;
+      internal_edge_ratio: number | string;
+      time_burst_fraction: number | string;
+      payment_format_count: number;
+      member_count: number;
+      illicit_member_count: number;
+      licit_member_count: number;
+    }
+
+    interface EdgeRow {
+      source: string;
+      target: string;
+    }
+
+    const clusterRows = clusters as unknown as ClusterRow[];
+    const clusterIds = clusterRows.map((c) => c.id);
     if (clusterIds.length === 0) {
       return NextResponse.json({ nodes: [], links: [], clusters: [] });
     }
@@ -139,40 +161,29 @@ export async function GET() {
         : [];
 
     // Format cluster response (no raw suspicion scores exposed)
-    const clusterResponse = clusters.map(
-      (c: {
-        id: number;
-        community_id: number;
-        is_flagged: boolean;
-        suspicion_score: number;
-        internal_edge_ratio: number;
-        time_burst_fraction: number;
-        payment_format_count: number;
-        member_count: number;
-        illicit_member_count: number;
-        licit_member_count: number;
-      }) => {
-        const score = parseFloat(String(c.suspicion_score));
-        return {
-          id: c.id,
-          communityId: c.community_id,
-          isFlagged: c.is_flagged,
-          // suspicionTier only — not the raw score
-          suspicionTier: !c.is_flagged ? "SAFE" : score > 0.65 ? "HIGH" : "MEDIUM",
-          memberCount: c.member_count,
-          illicitMemberCount: c.illicit_member_count,
-          licitMemberCount: c.licit_member_count,
-          // Qualitative density label — not the raw ratio
-          internalEdgeDensity: toDensityLabel(parseFloat(String(c.internal_edge_ratio))),
-          timeBurstPresent: parseFloat(String(c.time_burst_fraction)) > 0.3,
-          paymentFormatCount: c.payment_format_count,
-        };
-      }
-    );
+    const clusterResponse = clusterRows.map((c) => {
+      const score = parseFloat(String(c.suspicion_score));
+      return {
+        id: c.id,
+        communityId: c.community_id,
+        isFlagged: c.is_flagged,
+        // suspicionTier only — not the raw score
+        suspicionTier: !c.is_flagged ? "SAFE" : score > 0.65 ? "HIGH" : "MEDIUM",
+        memberCount: c.member_count,
+        illicitMemberCount: c.illicit_member_count,
+        licitMemberCount: c.licit_member_count,
+        // Qualitative density label — not the raw ratio
+        internalEdgeDensity: toDensityLabel(parseFloat(String(c.internal_edge_ratio))),
+        timeBurstPresent: parseFloat(String(c.time_burst_fraction)) > 0.3,
+        paymentFormatCount: c.payment_format_count,
+      };
+    });
+
+    const edgeRows = edges as unknown as EdgeRow[];
 
     return NextResponse.json({
       nodes: Array.from(nodeMap.values()),
-      links: edges.map((e: { source: string; target: string }) => ({
+      links: edgeRows.map((e) => ({
         source: e.source,
         target: e.target,
       })),

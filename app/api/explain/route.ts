@@ -27,10 +27,14 @@ import {
 } from "@/lib/llm-boundary";
 import { neon } from "@neondatabase/serverless";
 
-const sql = neon(process.env.DATABASE_URL!);
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json({ error: "DATABASE_URL not configured" }, { status: 500 });
+    }
+    const sql = neon(process.env.DATABASE_URL);
     const body = await req.json();
     const { clusterId } = body;
 

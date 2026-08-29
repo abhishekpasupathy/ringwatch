@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
  * RingWatch — Force Graph Wrapper
@@ -68,38 +69,46 @@ function getNodeSize(node: GraphNode, selectedClusterId?: number): number {
   return isSelected ? 8 : 5;
 }
 
+
+
 export default function ForceGraphWrapper({
   nodes,
   links,
   onNodeClick,
   selectedClusterId,
 }: ForceGraphWrapperProps) {
-  const fgRef = useRef<any>(null);
+  const fgRef = useRef<any>();
 
   const handleNodeClick = useCallback(
-    (node: any) => {
-      onNodeClick(node as GraphNode);
+    (node: Record<string, unknown>) => {
+      const gNode = node as unknown as GraphNode & { x?: number; y?: number };
+      onNodeClick(gNode);
       // Zoom into clicked node
-      fgRef.current?.centerAt(node.x, node.y, 800);
-      fgRef.current?.zoom(4, 800);
+      if (typeof gNode.x === "number" && typeof gNode.y === "number") {
+        fgRef.current?.centerAt(gNode.x, gNode.y, 800);
+        fgRef.current?.zoom(4, 800);
+      }
     },
     [onNodeClick]
   );
 
   const nodeCanvasObject = useCallback(
-    (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      const size = getNodeSize(node as GraphNode, selectedClusterId);
-      const color = getNodeColor(node as GraphNode, selectedClusterId);
+    (node: Record<string, unknown>, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const gNode = node as unknown as GraphNode & { x?: number; y?: number };
+      const x = gNode.x ?? 0;
+      const y = gNode.y ?? 0;
+      const size = getNodeSize(gNode, selectedClusterId);
+      const color = getNodeColor(gNode, selectedClusterId);
 
       ctx.beginPath();
-      ctx.arc(node.x, node.y, size / globalScale, 0, 2 * Math.PI);
+      ctx.arc(x, y, size / globalScale, 0, 2 * Math.PI);
       ctx.fillStyle = color;
       ctx.fill();
 
       // Glow effect for flagged nodes
-      if (node.isFlagged) {
+      if (gNode.isFlagged) {
         ctx.beginPath();
-        ctx.arc(node.x, node.y, (size + 3) / globalScale, 0, 2 * Math.PI);
+        ctx.arc(x, y, (size + 3) / globalScale, 0, 2 * Math.PI);
         ctx.strokeStyle = color.slice(0, 7) + "44";
         ctx.lineWidth = 2 / globalScale;
         ctx.stroke();
@@ -107,11 +116,11 @@ export default function ForceGraphWrapper({
 
       // Label at high zoom
       if (globalScale > 3) {
-        const label = node.id.split("_").slice(-1)[0].substring(0, 8);
+        const label = gNode.id.split("_").slice(-1)[0].substring(0, 8);
         ctx.font = `${10 / globalScale}px Inter, sans-serif`;
         ctx.textAlign = "center";
         ctx.fillStyle = "#e2e8f0";
-        ctx.fillText(label, node.x, node.y + (size + 5) / globalScale);
+        ctx.fillText(label, x, y + (size + 5) / globalScale);
       }
     },
     [selectedClusterId]
@@ -119,7 +128,7 @@ export default function ForceGraphWrapper({
 
   return (
     <ForceGraph2D
-      ref={fgRef}
+      ref={fgRef as any}
       graphData={{ nodes, links }}
       nodeId="id"
       nodeCanvasObject={nodeCanvasObject}
