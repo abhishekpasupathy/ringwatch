@@ -24,6 +24,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { toDensityLabel } from "@/lib/llm-boundary";
 
+import { ensureDataSeeded } from "@/lib/auto-seed";
+
 export const dynamic = "force-dynamic";
 
 // Maximum nodes to return (keeps the force graph performant in browser)
@@ -36,15 +38,25 @@ export async function GET() {
     }
 
     // Get most recent TEST detection run
-    const run = await prisma.detectionRun.findFirst({
+    let run = await prisma.detectionRun.findFirst({
       where: { split: "TEST" },
       orderBy: { runAt: "desc" },
       select: { id: true, modularityScore: true },
     });
 
     if (!run) {
+      // Auto-seed if database is empty (instant Vercel readiness)
+      await ensureDataSeeded();
+      run = await prisma.detectionRun.findFirst({
+        where: { split: "TEST" },
+        orderBy: { runAt: "desc" },
+        select: { id: true, modularityScore: true },
+      });
+    }
+
+    if (!run) {
       return NextResponse.json(
-        { error: "No detection run found. Run the evaluation scripts first." },
+        { error: "No detection run found and auto-seeding failed." },
         { status: 404 }
       );
     }
