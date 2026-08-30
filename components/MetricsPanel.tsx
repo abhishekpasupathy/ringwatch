@@ -13,6 +13,10 @@ interface MetricsPanelProps {
     f1: number;
     fpCostNote: string;
     computedAt: string;
+    modelName?: string;
+    evaluationProtocol?: string;
+    evaluationLevel?: string;
+    note?: string;
   } | null;
   loading?: boolean;
 }
@@ -106,11 +110,11 @@ export default function MetricsPanel({ metrics, loading }: MetricsPanelProps) {
         <div className="flex items-center gap-2">
           <BarChart2 size={15} className="text-teal-400" />
           <h2 className="text-slate-200 font-bold text-xs uppercase tracking-wider">
-            Test Set Evaluation
+            {metrics.modelName ?? "Test Set Evaluation"}
           </h2>
         </div>
         <span className="text-[10px] text-teal-400 font-mono bg-teal-500/10 border border-teal-500/20 px-2 py-0.5 rounded-full">
-          20% Temporal Holdout
+          {metrics.evaluationProtocol ?? "20% Temporal Holdout"}
         </span>
       </div>
 
@@ -137,33 +141,33 @@ export default function MetricsPanel({ metrics, loading }: MetricsPanelProps) {
       <div className="flex items-start gap-2 bg-[#090d16] rounded-xl p-3 border border-slate-800/80">
         <Info size={14} className="text-slate-400 mt-0.5 flex-shrink-0" />
         <p className="text-slate-400 text-[11px] leading-relaxed">
-          <span className="font-semibold text-slate-300">Louvain Variance:</span> ±1–2% across runs on this dataset. See <code className="text-teal-400 font-mono">eval-report.md</code> for details.
+          {metrics.note ?? "Louvain variance can change results slightly across runs. See eval-report.md for details."}
         </p>
       </div>
 
       {/* Confusion Matrix Grid */}
       <section>
         <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">
-          Confusion Matrix (Account Level)
+          Confusion Matrix ({metrics.evaluationLevel ?? "Account"})
         </h3>
         <div className="grid grid-cols-2 gap-2">
           <ConfusionCell
             label="True Positive"
             value={metrics.tp}
             color="border-teal-500/30 bg-teal-500/5"
-            description="Correctly flagged ring"
+            description="Correctly identified risk"
           />
           <ConfusionCell
             label="False Positive"
             value={metrics.fp}
             color="border-amber-500/30 bg-amber-500/5"
-            description="Licit account hold"
+            description="Legitimate item reviewed"
           />
           <ConfusionCell
             label="False Negative"
             value={metrics.fn}
             color="border-red-500/30 bg-red-500/5"
-            description="Missed ring member"
+            description="Missed risky item"
           />
           <ConfusionCell
             label="True Negative"

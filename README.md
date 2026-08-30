@@ -35,6 +35,48 @@ flowchart LR
     Dashboard --> Explain["Bounded LLM explanation"]
 ```
 
+### Chargeback prevention timeline
+
+```mermaid
+timeline
+    title Chargeback prevention timeline
+    Day 1 : Coordinated accounts distribute payments across merchants
+          : RingWatch builds a shared transaction graph
+    Day 2 : Analyst reviews graph evidence and risk context
+          : Merchant can pause fulfilment or settlement
+    Day 14-30 : Cardholder disputes the payment
+          : Unprotected merchant faces a chargeback and product loss
+```
+
+### Original pipeline view
+
+```mermaid
+flowchart TD
+    subgraph Data_Layer["1. Dataset and ingestion"]
+        IBM["IBM AML transaction data"] -->|"01-ingest.ts"| PG[("Neon Postgres")]
+        PG -->|"02-split.ts"| Train["TRAIN: earliest 80%"]
+        PG -->|"02-split.ts"| Test["TEST: latest 20%"]
+    end
+    subgraph Graph_Baseline["2. Graph baseline"]
+        Train -->|"03-detect-train.ts"| Builder["Weighted graph builder"]
+        Builder --> Louvain["Louvain communities"]
+        Louvain --> GraphScore["Structural risk scoring"]
+        GraphScore --> GraphRun[("Persisted clusters")]
+    end
+    subgraph Supervised_Benchmark["3. Supervised benchmark"]
+        PG --> Features["Transaction and history features"]
+        Features --> Trees["ExtraTrees classifier"]
+        Trees --> Validation["Validation threshold selection"]
+        Validation --> Benchmark["Held-out benchmark"]
+    end
+    subgraph Product["4. Investigation product"]
+        GraphRun --> API["Graph, lookup, metrics APIs"]
+        Benchmark --> API
+        API --> Dashboard["Next.js dashboard"]
+        Dashboard --> Explain["Bounded explanation layer"]
+    end
+```
+
 ### What happens during an investigation
 
 ```mermaid
@@ -89,6 +131,21 @@ flowchart TD
     Boundary -->|"Raw IDs, amounts, scores, thresholds"| Block["Blocked"]
     Prompt --> Summary["Plain-language summary"]
     Summary --> Analyst["Human review"]
+```
+
+### Decision and explanation boundary
+
+```mermaid
+gantt
+    title Decision versus explanation boundary
+    dateFormat X
+    axisFormat %s
+    section Deterministic and supervised scoring
+    Build features and graph :active, d1, 0, 3
+    Score and apply policy :crit, active, d2, 3, 5
+    section Explanation
+    Validate qualitative evidence :milestone, m1, 5, 5
+    Generate plain-language summary :done, d3, 5, 8
 ```
 
 The detector remains auditable because the explanation layer cannot change a score, a threshold, or an account status. The dashboard deliberately exposes qualitative tiers and structural evidence rather than a recipe for evasion.

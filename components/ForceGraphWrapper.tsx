@@ -238,9 +238,12 @@ const ForceGraphWrapper = forwardRef<ForceGraphHandle, ForceGraphWrapperProps>(
           glowColor = "rgba(245, 158, 11, 0.4)";
         }
 
-        // Dim non-neighbor nodes when hovering
+        // Keep risk nodes visible during hover. Previously all non-neighbors
+        // were faded to 20%, which made nearby ring nodes appear to disappear.
         const isDimmed = hoverNode && !isNeighbor;
-        const opacity = isDimmed ? 0.2 : 1.0;
+        const opacity = !isDimmed
+          ? 1
+          : (gNode.isIllicit || gNode.isExposed ? 0.85 : 0.42);
 
         ctx.save();
         ctx.globalAlpha = opacity;

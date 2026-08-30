@@ -24,6 +24,9 @@ import {
 } from "@/lib/llm-boundary";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, max-age=0" };
 
 export async function GET(req: NextRequest) {
   try {
@@ -33,14 +36,14 @@ export async function GET(req: NextRequest) {
     if (!accountId) {
       return NextResponse.json(
         { error: "Query parameter 'account_id' is required." },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
     if (!process.env.DATABASE_URL) {
       return NextResponse.json(
         { error: "DATABASE_URL environment variable is missing." },
-        { status: 500 }
+        { status: 500, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -56,7 +59,7 @@ export async function GET(req: NextRequest) {
         accountId,
         status: "NOT_FOUND",
         message: `Account ID "${accountId}" was not found in the transaction dataset.`,
-      });
+      }, { headers: NO_STORE_HEADERS });
     }
 
     // 2. Find cluster membership in the latest TEST run (indexed lookup)
@@ -78,6 +81,37 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    // A red graph node is backed by the dataset's known illicit label. Do not
+    // overwrite that evidence with SAFE just because Louvain missed its cluster.
+    if (clusterMember?.isIllicit || account.isIllicitLabel) {
+      const cluster = clusterMember?.cluster;
+      const isGraphFlagged = cluster?.isFlagged ?? false;
+      const suspicionTier = cluster
+        ? toSuspicionTier(cluster.suspicionScore, threshold)
+        : "HIGH";
+      return NextResponse.json({
+        found: true,
+        accountId: account.id,
+        status: "RING_MEMBER",
+        statusLabel: isGraphFlagged ? "Confirmed Ring Member" : "Known Labelled Ring Member",
+        clusterId: cluster?.communityId,
+        suspicionTier,
+        message: isGraphFlagged
+          ? "This account is a confirmed illicit member of a flagged coordinated transaction ring."
+          : "This account carries an illicit dataset label. The current Louvain baseline did not flag its community, so this is ground-truth context rather than a graph-model alert.",
+        ...(cluster ? {
+          structuralEvidence: {
+            clusterSize: cluster.memberCount,
+            illicitMembers: cluster.illicitMemberCount,
+            exposedMerchants: cluster.licitMemberCount,
+            internalEdgeDensity: toDensityLabel(cluster.internalEdgeRatio),
+            timeBurstPresent: cluster.timeBurstFraction > 0.3,
+            paymentFormatCount: cluster.paymentFormatCount,
+          },
+        } : {}),
+      }, { headers: NO_STORE_HEADERS });
+    }
+
     // 3. Status determination logic
     if (!clusterMember || !clusterMember.cluster.isFlagged) {
       // Account is SAFE
@@ -92,7 +126,7 @@ export async function GET(req: NextRequest) {
           bank: account.bank,
           accountNumber: account.accountNum,
         },
-      });
+      }, { headers: NO_STORE_HEADERS });
     }
 
     // Account is in a flagged cluster
@@ -147,12 +181,12 @@ export async function GET(req: NextRequest) {
         timeBurstPresent,
         paymentFormatCount: cluster.paymentFormatCount,
       },
-    });
+    }, { headers: NO_STORE_HEADERS });
   } catch (err) {
     console.error("/api/lookup error:", err);
     return NextResponse.json(
       { error: "Failed to perform account lookup." },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

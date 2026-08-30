@@ -9,6 +9,12 @@
     },
     "app/api/metrics/route.ts": {
       "maxDuration": 10
+    },
+    "app/api/demo-accounts/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/lookup/route.ts": {
+      "maxDuration": 10
     }
   }
 }

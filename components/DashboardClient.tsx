@@ -13,7 +13,7 @@ interface ClusterData {
   memberCount: number; illicitMemberCount: number; licitMemberCount: number;
   internalEdgeDensity: "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH"; timeBurstPresent: boolean; paymentFormatCount: number;
 }
-interface MetricsData { tp: number; fp: number; fn: number; tn: number; precision: number; recall: number; f1: number; fpCostNote: string; computedAt: string; }
+interface MetricsData { tp: number; fp: number; fn: number; tn: number; precision: number; recall: number; f1: number; fpCostNote: string; computedAt: string; modelName?: string; evaluationProtocol?: string; evaluationLevel?: string; note?: string; }
 
 export default function DashboardClient() {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
