@@ -14,12 +14,15 @@
     "detect": "tsx scripts/03-detect-train.ts",
     "evaluate": "tsx scripts/04-evaluate.ts",
     "ml": "tsx scripts/05-ml-train-evaluate.ts",
+    "ml:gb": "tsx scripts/06-gradient-boosting-train-evaluate.ts",
     "test:detector": "tsx scripts/detector-regression-test.ts",
     "test:ingest": "tsx scripts/ingest-resilience-test.ts",
     "test:ml": "tsx scripts/ml-regression-test.ts",
+    "test:gb": "tsx scripts/gradient-boosting-regression-test.ts",
     "pipeline": "npm run ingest && npm run split && npm run detect && npm run evaluate"
   },
   "dependencies": {
+    "@kanaries/ml": "^0.1.0",
     "@neondatabase/serverless": "^1.1.0",
     "@prisma/client": "^5.22.0",
     "@types/papaparse": "^5.5.2",
