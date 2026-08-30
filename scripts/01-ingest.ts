@@ -18,9 +18,10 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const CSV_FILENAME = "HI-Small_Trans.csv";
 const CSV_PATH = path.join(DATA_DIR, CSV_FILENAME);
 
-// Small batches avoid oversized statements. Transient Neon disconnects are
-// retried by retryDatabaseOperation so a long ingestion can resume safely.
-const BATCH_SIZE = 500;
+// Larger batches dramatically reduce Neon network round trips while keeping
+// individual INSERT statements at a manageable size.
+const BATCH_SIZE = 2_000;
+const TRANSACTION_CONCURRENCY = 3;
 
 interface RawRow {
   timestamp: string;
@@ -162,36 +163,48 @@ async function ingestAccounts(
   console.log(`\n✓ Accounts ingested`);
 }
 
+async function ingestTransactionBatch(rows: RawRow[]) {
+  await retryDatabaseOperation(
+    () =>
+      prisma.transaction.createMany({
+        data: rows.map((r) => ({
+          fromAccountId: `${r.fromBank}_${r.fromAccount}`,
+          toAccountId: `${r.toBank}_${r.toAccount}`,
+          amountPaid: r.amountPaid,
+          amountReceived: r.amountReceived,
+          paymentCurrency: r.paymentCurrency,
+          receivingCurrency: r.receivingCurrency,
+          paymentFormat: r.paymentFormat,
+          timestamp: new Date(r.timestamp),
+          isLaunderingLabel: r.isLaundering === 1,
+          split: "TRAIN",
+        })),
+        skipDuplicates: true,
+      }),
+    { retries: 5, baseDelayMs: 1000 }
+  );
+}
+
 async function ingestTransactions(rows: RawRow[]) {
-  console.log(`\nIngesting ${rows.length.toLocaleString()} transactions...`);
+  console.log(
+    `\nIngesting ${rows.length.toLocaleString()} transactions (${BATCH_SIZE.toLocaleString()} per batch, ${TRANSACTION_CONCURRENCY} concurrent)...`
+  );
 
+  const batches: RawRow[][] = [];
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
-    await retryDatabaseOperation(
-      () =>
-        prisma.transaction.createMany({
-          data: batch.map((r) => ({
-            fromAccountId: `${r.fromBank}_${r.fromAccount}`,
-            toAccountId: `${r.toBank}_${r.toAccount}`,
-            amountPaid: r.amountPaid,
-            amountReceived: r.amountReceived,
-            paymentCurrency: r.paymentCurrency,
-            receivingCurrency: r.receivingCurrency,
-            paymentFormat: r.paymentFormat,
-            timestamp: new Date(r.timestamp),
-            isLaunderingLabel: r.isLaundering === 1,
-            split: "TRAIN",
-          })),
-          skipDuplicates: true,
-        }),
-      { retries: 5, baseDelayMs: 1000 }
-    );
+    batches.push(rows.slice(i, i + BATCH_SIZE));
+  }
 
-    if (i % 50_000 === 0) {
-      process.stdout.write(
-        `  Transactions: ${Math.min(i + BATCH_SIZE, rows.length).toLocaleString()} / ${rows.length.toLocaleString()}\r`
-      );
-    }
+  let completed = 0;
+  for (let i = 0; i < batches.length; i += TRANSACTION_CONCURRENCY) {
+    const group = batches.slice(i, i + TRANSACTION_CONCURRENCY);
+    await Promise.all(group.map((batch) => ingestTransactionBatch(batch)));
+    completed += group.length;
+
+    const processed = Math.min(completed * BATCH_SIZE, rows.length);
+    process.stdout.write(
+      `  Transactions: ${processed.toLocaleString()} / ${rows.length.toLocaleString()}\r`
+    );
   }
   console.log(`\n✓ Transactions ingested`);
 }
