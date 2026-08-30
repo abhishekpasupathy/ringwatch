@@ -27,9 +27,7 @@ function sigmoid(value: number): number {
 }
 
 export function standardizeFeatures(features: number[][]): StandardizedFeatures {
-  if (features.length === 0) {
-    throw new Error("Cannot standardize an empty feature matrix");
-  }
+  if (features.length === 0) throw new Error("Cannot standardize an empty feature matrix");
 
   const width = features[0].length;
   if (width === 0 || features.some((row) => row.length !== width)) {
@@ -51,12 +49,7 @@ export function standardizeFeatures(features: number[][]): StandardizedFeatures 
     return row.map((value, j) => (value - means[j]) / scales[j]);
   };
 
-  return {
-    values: features.map(transform),
-    means,
-    scales,
-    transform,
-  };
+  return { values: features.map(transform), means, scales, transform };
 }
 
 export function fitLogisticRegression(
@@ -73,16 +66,13 @@ export function fitLogisticRegression(
     throw new Error("Features and labels must be non-empty and have equal length");
   }
 
+  const standardized = standardizeFeatures(features);
+  const x = standardized.values;
   const learningRate = options.learningRate ?? 0.05;
   const iterations = options.iterations ?? 1500;
   const positiveClassWeight = options.positiveClassWeight ?? 1;
   const l2 = options.l2 ?? 0.001;
-  const width = features[0].length;
-
-  if (width === 0 || features.some((row) => row.length !== width)) {
-    throw new Error("Feature matrix must be rectangular and non-empty");
-  }
-
+  const width = x[0].length;
   const weights = new Array<number>(width).fill(0);
   let bias = 0;
 
@@ -90,8 +80,8 @@ export function fitLogisticRegression(
     const gradients = new Array<number>(width).fill(0);
     let biasGradient = 0;
 
-    for (let i = 0; i < features.length; i++) {
-      const row = features[i];
+    for (let i = 0; i < x.length; i++) {
+      const row = x[i];
       const label = labels[i];
       const probability = sigmoid(
         bias + row.reduce((sum, value, j) => sum + value * weights[j], 0)
@@ -103,14 +93,13 @@ export function fitLogisticRegression(
       biasGradient += error;
     }
 
-    const scale = 1 / features.length;
+    const scale = 1 / x.length;
     for (let j = 0; j < width; j++) {
       weights[j] -= learningRate * (gradients[j] * scale + l2 * weights[j]);
     }
     bias -= learningRate * biasGradient * scale;
   }
 
-  const standardized = standardizeFeatures(features);
   return {
     weights,
     bias,
@@ -156,7 +145,6 @@ export function chooseThreshold(
     const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
     const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
     const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
-
     if (f1 > best.f1) best = { threshold, precision, recall, f1 };
   }
 
