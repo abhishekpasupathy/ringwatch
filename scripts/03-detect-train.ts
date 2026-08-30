@@ -3,6 +3,8 @@ import { buildGraph, percentile99 } from "../lib/graph-builder";
 import { scoreAllCommunities, sweepThreshold } from "../lib/detector";
 
 const MINIMUM_COMMUNITY_SIZE = 3;
+const CLUSTER_BATCH_SIZE = 500;
+const MEMBER_BATCH_SIZE = 2000;
 
 async function main() {
   console.log("══════════════════════════════════════════");
@@ -73,9 +75,11 @@ async function main() {
     data: { split: "TRAIN", threshold: optimalThreshold, modularityScore },
   });
 
-  for (const comm of finalScored) {
-    const cluster = await prisma.cluster.create({
-      data: {
+  // Create all clusters in batches instead of one network round-trip per community.
+  for (let i = 0; i < finalScored.length; i += CLUSTER_BATCH_SIZE) {
+    const batch = finalScored.slice(i, i + CLUSTER_BATCH_SIZE);
+    await prisma.cluster.createMany({
+      data: batch.map((comm) => ({
         runId: run.id,
         communityId: comm.communityId,
         isFlagged: comm.isFlagged,
@@ -86,18 +90,40 @@ async function main() {
         memberCount: comm.memberCount,
         illicitMemberCount: comm.illicitMemberCount,
         licitMemberCount: comm.licitMemberCount,
-      },
-    });
-
-    await prisma.clusterMember.createMany({
-      data: comm.members.map((accountId) => ({
-        clusterId: cluster.id,
-        accountId,
-        isIllicit: illicitSet.has(accountId),
-        isExposed: comm.isFlagged && !illicitSet.has(accountId),
       })),
       skipDuplicates: true,
     });
+    console.log(`  Clusters: ${Math.min(i + batch.length, finalScored.length).toLocaleString()} / ${finalScored.length.toLocaleString()}`);
+  }
+
+  // Fetch the generated cluster IDs once, then insert all membership rows in batches.
+  const persistedClusters = await prisma.cluster.findMany({
+    where: { runId: run.id },
+    select: { id: true, communityId: true },
+  });
+  const clusterIdByCommunity = new Map(
+    persistedClusters.map((cluster) => [cluster.communityId, cluster.id])
+  );
+
+  const memberRows = finalScored.flatMap((comm) => {
+    const clusterId = clusterIdByCommunity.get(comm.communityId);
+    if (!clusterId) throw new Error(`Missing persisted cluster for community ${comm.communityId}`);
+    return comm.members.map((accountId) => ({
+      clusterId,
+      accountId,
+      isIllicit: illicitSet.has(accountId),
+      isExposed: comm.isFlagged && !illicitSet.has(accountId),
+    }));
+  });
+
+  console.log(`  Persisting ${memberRows.length.toLocaleString()} cluster memberships...`);
+  for (let i = 0; i < memberRows.length; i += MEMBER_BATCH_SIZE) {
+    const batch = memberRows.slice(i, i + MEMBER_BATCH_SIZE);
+    await prisma.clusterMember.createMany({
+      data: batch,
+      skipDuplicates: true,
+    });
+    console.log(`  Members: ${Math.min(i + batch.length, memberRows.length).toLocaleString()} / ${memberRows.length.toLocaleString()}`);
   }
 
   console.log(`\n✓ Stage 2 complete. Detection run ID: ${run.id}`);
