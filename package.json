@@ -22,7 +22,7 @@
     "pipeline": "npm run ingest && npm run split && npm run detect && npm run evaluate"
   },
   "dependencies": {
-    "@kanaries/ml": "^0.1.0",
+    "@kanaries/ml": "^1.1.0",
     "@neondatabase/serverless": "^1.1.0",
     "@prisma/client": "^5.22.0",
     "@types/papaparse": "^5.5.2",
