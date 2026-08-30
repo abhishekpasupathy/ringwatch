@@ -1,20 +1,3 @@
-/**
- * RingWatch — Test-set evaluation script (Stage 3)
- *
- * Loads the TRAIN detection run (with tuned threshold) from DB,
- * builds the TEST graph, applies the SAME threshold, computes
- * confusion matrix + precision/recall/F1, and writes eval-report.md.
- *
- * This script is the primary Stage 3 deliverable.
- * eval-report.md is a first-class output, not an afterthought.
- *
- * STRICT DATA HYGIENE:
- * - The threshold was tuned ONLY on TRAIN data (03-detect-train.ts)
- * - This script reads it from the DB DetectionRun record
- * - It applies it to TEST data without any further tuning
- * - eval-report.md explicitly states which split metrics are from
- */
-
 import * as fs from "fs";
 import * as path from "path";
 import prisma from "../lib/db";
@@ -27,7 +10,6 @@ async function main() {
   console.log("  RingWatch — Stage 3: Test Evaluation");
   console.log("══════════════════════════════════════════\n");
 
-  // ── Load the most recent TRAIN detection run (for threshold) ──────────────
   const trainRun = await prisma.detectionRun.findFirst({
     where: { split: "TRAIN" },
     orderBy: { runAt: "desc" },
@@ -37,10 +19,7 @@ async function main() {
     process.exit(1);
   }
   console.log(`Using TRAIN run ID: ${trainRun.id} (threshold from train tuning)`);
-  // NOTE: We do not log trainRun.threshold to avoid leaking it to terminal
-  // output that might appear in screenshots or public CI logs.
 
-  // ── Load TEST transactions ────────────────────────────────────────────────
   console.log("\nLoading TEST transactions...");
   const testTransactions = await prisma.transaction.findMany({
     where: { split: "TEST" },
@@ -58,43 +37,49 @@ async function main() {
   const testIllicitTx = testTransactions.filter((t) => t.isLaunderingLabel).length;
   const testLicitTx = testTransactions.length - testIllicitTx;
 
-  // ── Load illicit account set ──────────────────────────────────────────────
-  const illicitAccounts = await prisma.account.findMany({
-    where: { isIllicitLabel: true },
-    select: { id: true },
-  });
-  const illicitSet = new Set(illicitAccounts.map((a) => a.id));
+  // TEST labels are ground truth only. They are never passed into scoring.
+  const testIllicitSet = new Set<string>();
+  for (const tx of testTransactions) {
+    if (tx.isLaunderingLabel) {
+      testIllicitSet.add(tx.fromAccountId);
+      testIllicitSet.add(tx.toAccountId);
+    }
+  }
 
-  // Get unique accounts in TEST split
   const testAccountIds = new Set([
     ...testTransactions.map((t) => t.fromAccountId),
     ...testTransactions.map((t) => t.toAccountId),
   ]);
   const totalTestAccounts = testAccountIds.size;
   console.log(`  Unique accounts in TEST: ${totalTestAccounts.toLocaleString()}`);
+  console.log(`  TEST illicit accounts (evaluation labels): ${testIllicitSet.size.toLocaleString()}`);
 
-  // ── Build TEST graph ──────────────────────────────────────────────────────
+  // Freeze normalization from TRAIN. Do not calculate statistics from TEST.
+  const trainTransactionsForP99 = await prisma.transaction.findMany({
+    where: { split: "TRAIN" },
+    select: { amountPaid: true },
+  });
+  const trainAmountP99 = percentile99(trainTransactionsForP99.map((t) => t.amountPaid));
+  console.log(`  Using TRAIN amount P99 for TEST: ${trainAmountP99.toFixed(2)}`);
+
   console.log("\nBuilding TEST graph...");
-  const allAmounts = testTransactions.map((t) => t.amountPaid);
-  const amountP99 = percentile99(allAmounts);
   const { graph, communities, modularityScore } = buildGraph(
     testTransactions,
-    amountP99
+    trainAmountP99
   );
   console.log(`  Nodes: ${graph.order.toLocaleString()}, Edges: ${graph.size.toLocaleString()}`);
   console.log(`  Louvain modularity: ${modularityScore.toFixed(4)}`);
 
-  // ── Apply TRAIN threshold to TEST data ───────────────────────────────────
+  // IMPORTANT: no TEST labels enter prediction/scoring.
   const finalScored = scoreAllCommunities(
     graph,
     communities,
-    illicitSet,
+    new Set(),
     trainRun.threshold
   );
 
-  // ── Evaluate ──────────────────────────────────────────────────────────────
   console.log("\nEvaluating...");
-  const result = evaluate(finalScored, illicitSet, totalTestAccounts);
+  const result = evaluate(finalScored, testIllicitSet, totalTestAccounts);
   const { confusion, precision, recall, f1 } = result;
 
   console.log(`\n── Confusion Matrix (TEST, Account Level) ──`);
@@ -105,7 +90,6 @@ async function main() {
   console.log(`  Recall    : ${(recall * 100).toFixed(1)}%`);
   console.log(`  F1        : ${(f1 * 100).toFixed(1)}%`);
 
-  // ── Persist eval metrics ──────────────────────────────────────────────────
   await prisma.evalMetrics.create({
     data: {
       split: "TEST",
@@ -121,14 +105,10 @@ async function main() {
   });
   console.log("\n✓ Metrics persisted to DB");
 
-  // ── Persist TEST detection run ────────────────────────────────────────────
   const testRun = await prisma.detectionRun.create({
-    data: {
-      split: "TEST",
-      threshold: trainRun.threshold,
-      modularityScore,
-    },
+    data: { split: "TEST", threshold: trainRun.threshold, modularityScore },
   });
+
   for (const comm of finalScored) {
     const cluster = await prisma.cluster.create({
       data: {
@@ -138,9 +118,7 @@ async function main() {
         suspicionScore: comm.suspicionScore,
         internalEdgeRatio: comm.internalEdgeRatio,
         timeBurstFraction: comm.timeBurstFraction,
-        paymentFormatCount: comm.paymentFormatDiversity > 0
-          ? Math.round(comm.paymentFormatDiversity * comm.memberCount)
-          : 1,
+        paymentFormatCount: Math.max(1, Math.round(comm.paymentFormatDiversity * comm.memberCount)),
         memberCount: comm.memberCount,
         illicitMemberCount: comm.illicitMemberCount,
         licitMemberCount: comm.licitMemberCount,
@@ -150,22 +128,19 @@ async function main() {
       data: comm.members.map((accountId) => ({
         clusterId: cluster.id,
         accountId,
-        isIllicit: illicitSet.has(accountId),
-        isExposed: comm.isFlagged && !illicitSet.has(accountId),
+        isIllicit: testIllicitSet.has(accountId),
+        isExposed: comm.isFlagged && !testIllicitSet.has(accountId),
       })),
       skipDuplicates: true,
     });
   }
 
-  // ── Write eval-report.md ──────────────────────────────────────────────────
   const louvainVarianceNote =
     `Louvain community detection (graphology-communities-louvain) is a heuristic ` +
     `greedy algorithm with no deterministic seed parameter. We mitigate this by ` +
-    `sorting nodes and edges alphabetically before graph insertion and running ` +
-    `the algorithm 5× per graph build, selecting the partition with the highest ` +
-    `modularity score. Observed variance across runs on this dataset: ±1-2% on ` +
-    `precision/recall. Production deployment would use a consensus ensemble or ` +
-    `switch to Label Propagation (fully deterministic).`;
+    `sorting nodes and edges before insertion and running the algorithm 5× per graph build, ` +
+    `selecting the partition with the highest modularity score. Results can vary slightly ` +
+    `across environments.`;
 
   const report = formatEvalReport(result, {
     split: "TEST (temporal holdout, latest 20% by timestamp)",
