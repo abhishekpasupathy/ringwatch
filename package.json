@@ -14,6 +14,7 @@
     "detect": "tsx scripts/03-detect-train.ts",
     "evaluate": "tsx scripts/04-evaluate.ts",
     "test:detector": "tsx scripts/detector-regression-test.ts",
+    "test:ingest": "tsx scripts/ingest-resilience-test.ts",
     "pipeline": "npm run ingest && npm run split && npm run detect && npm run evaluate"
   },
   "dependencies": {
@@ -27,7 +28,6 @@
     "groq-sdk": "^1.6.0",
     "lucide-react": "^1.37.0",
     "next": "14.2.35",
-    "papaparse": "^5.7.0",
     "react": "^18",
     "react-dom": "^18",
     "react-force-graph-2d": "^1.29.1",
@@ -38,12 +38,11 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^8",
-    "eslint-config-next": "14.2.35",
-    "postcss": "^8",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "eslint-config-next": "14.2.35"
   },
   "allowScripts": {
+    "@prisma/client@5.22.0": true,
+    "prisma@5.22.0": true,
     "@prisma/client@5.22.0": true,
     "prisma@5.22.0": true,
     "@prisma/engines@5.22.0": true
