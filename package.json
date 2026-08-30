@@ -6,7 +6,6 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "postinstall": "prisma generate",
-    "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
@@ -14,6 +13,7 @@
     "split": "tsx scripts/02-split.ts",
     "detect": "tsx scripts/03-detect-train.ts",
     "evaluate": "tsx scripts/04-evaluate.ts",
+    "test:detector": "tsx scripts/detector-regression-test.ts",
     "pipeline": "npm run ingest && npm run split && npm run detect && npm run evaluate"
   },
   "dependencies": {
@@ -28,10 +28,6 @@
     "lucide-react": "^1.37.0",
     "next": "14.2.35",
     "papaparse": "^5.7.0",
-    "prisma": "^5.22.0",
-    "react": "^18",
-    "react-dom": "^18",
-    "react-force-graph-2d": "^1.29.1",
     "tsx": "^4.23.12"
   },
   "devDependencies": {
