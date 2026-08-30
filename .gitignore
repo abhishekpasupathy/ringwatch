@@ -44,3 +44,4 @@ eval-report.md
 
 # Prisma generated client
 /node_modules/.prisma
+.env*
