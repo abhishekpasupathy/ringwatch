@@ -37,7 +37,7 @@ async function main() {
   const testIllicitTx = testTransactions.filter((t) => t.isLaunderingLabel).length;
   const testLicitTx = testTransactions.length - testIllicitTx;
 
-  // TEST labels are ground truth only. They are never passed into scoring.
+  // TEST labels are ground truth only. They are never used to calculate scores.
   const testIllicitSet = new Set<string>();
   for (const tx of testTransactions) {
     if (tx.isLaunderingLabel) {
@@ -54,7 +54,7 @@ async function main() {
   console.log(`  Unique accounts in TEST: ${totalTestAccounts.toLocaleString()}`);
   console.log(`  TEST illicit accounts (evaluation labels): ${testIllicitSet.size.toLocaleString()}`);
 
-  // Freeze normalization from TRAIN. Do not calculate statistics from TEST.
+  // Freeze normalization from TRAIN. Never calculate normalization statistics from TEST.
   const trainTransactionsForP99 = await prisma.transaction.findMany({
     where: { split: "TRAIN" },
     select: { amountPaid: true },
@@ -63,18 +63,15 @@ async function main() {
   console.log(`  Using TRAIN amount P99 for TEST: ${trainAmountP99.toFixed(2)}`);
 
   console.log("\nBuilding TEST graph...");
-  const { graph, communities, modularityScore } = buildGraph(
-    testTransactions,
-    trainAmountP99
-  );
+  const { graph, communities, modularityScore } = buildGraph(testTransactions, trainAmountP99);
   console.log(`  Nodes: ${graph.order.toLocaleString()}, Edges: ${graph.size.toLocaleString()}`);
   console.log(`  Louvain modularity: ${modularityScore.toFixed(4)}`);
 
-  // IMPORTANT: no TEST labels enter prediction/scoring.
+  // Labels are passed only for display/reporting fields. detector.ts never uses them in suspicionScore.
   const finalScored = scoreAllCommunities(
     graph,
     communities,
-    new Set(),
+    testIllicitSet,
     trainRun.threshold
   );
 
@@ -137,10 +134,9 @@ async function main() {
 
   const louvainVarianceNote =
     `Louvain community detection (graphology-communities-louvain) is a heuristic ` +
-    `greedy algorithm with no deterministic seed parameter. We mitigate this by ` +
-    `sorting nodes and edges before insertion and running the algorithm 5× per graph build, ` +
-    `selecting the partition with the highest modularity score. Results can vary slightly ` +
-    `across environments.`;
+    `greedy algorithm with no deterministic seed parameter. Nodes and edges are sorted before insertion, ` +
+    `and the algorithm runs 5× per graph build, selecting the partition with the highest modularity score. ` +
+    `Results can vary slightly across environments.`;
 
   const report = formatEvalReport(result, {
     split: "TEST (temporal holdout, latest 20% by timestamp)",
