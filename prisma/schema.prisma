@@ -83,6 +83,7 @@ model Cluster {
   run     DetectionRun    @relation(fields: [runId], references: [id])
   members ClusterMember[]
 
+  @@unique([runId, communityId])
   @@index([runId, isFlagged])
   @@map("clusters")
 }
