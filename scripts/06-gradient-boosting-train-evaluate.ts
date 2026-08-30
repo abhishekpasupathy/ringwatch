@@ -1,4 +1,6 @@
 import prisma from "../lib/db";
+import { buildGraph, percentile99 } from "../lib/graph-builder";
+import { buildAccountGraphFeatures } from "../lib/account-graph-features";
 import { chooseThreshold } from "../lib/ml-detector";
 import { predictGradientProbabilities, trainGradientBoosting } from "../lib/gradient-boosting-detector";
 
@@ -16,7 +18,7 @@ function emptyFeatures(): AccountFeatures {
   return { txCount: 0, incomingCount: 0, outgoingCount: 0, totalReceived: 0, totalSent: 0, uniqueCounterparties: new Set(), paymentFormats: new Set() };
 }
 
-function buildFeatures(transactions: {
+function buildBehaviorFeatures(transactions: {
   fromAccountId: string; toAccountId: string; amountPaid: number; amountReceived: number; paymentFormat: string;
 }[]): Map<string, AccountFeatures> {
   const result = new Map<string, AccountFeatures>();
@@ -32,8 +34,23 @@ function buildFeatures(transactions: {
   return result;
 }
 
-function vector(f: AccountFeatures): number[] {
-  return [Math.log1p(f.txCount), Math.log1p(f.incomingCount), Math.log1p(f.outgoingCount), Math.log1p(f.totalReceived), Math.log1p(f.totalSent), Math.log1p(f.uniqueCounterparties.size), Math.log1p(f.paymentFormats.size)];
+function vector(behavior: AccountFeatures, graph: ReturnType<typeof buildAccountGraphFeatures> extends Map<string, infer T> ? T : never): number[] {
+  return [
+    Math.log1p(behavior.txCount),
+    Math.log1p(behavior.incomingCount),
+    Math.log1p(behavior.outgoingCount),
+    Math.log1p(behavior.totalReceived),
+    Math.log1p(behavior.totalSent),
+    Math.log1p(behavior.uniqueCounterparties.size),
+    Math.log1p(behavior.paymentFormats.size),
+    Math.log1p(graph.inDegree),
+    Math.log1p(graph.outDegree),
+    Math.log1p(graph.totalDegree),
+    Math.log1p(graph.communitySize),
+    graph.communityDensity,
+    Math.log1p(graph.communityTriangleCount),
+    graph.inOutAmountRatio,
+  ];
 }
 
 function metrics(probabilities: number[], labels: number[], threshold: number) {
@@ -51,22 +68,34 @@ function metrics(probabilities: number[], labels: number[], threshold: number) {
   return { tp, fp, fn, tn, precision, recall, f1 };
 }
 
-function sampleNegatives(examples: { features: number[]; label: number }[], maxNegativesPerPositive: number): { features: number[]; label: number }[] {
+function sampleNegatives(examples: { features: number[]; label: number }[], maxNegativesPerPositive: number) {
   const positives = examples.filter((e) => e.label === 1);
   const negatives = examples.filter((e) => e.label === 0);
-  const limit = positives.length * maxNegativesPerPositive;
-  // Deterministic stride sampling keeps the experiment reproducible without random state hidden in the script.
-  const sampled = negatives.length <= limit ? negatives : negatives.filter((_, i) => i % Math.ceil(negatives.length / limit) === 0).slice(0, limit);
+  const limit = Math.max(positives.length * maxNegativesPerPositive, 1);
+  const stride = Math.max(1, Math.ceil(negatives.length / limit));
+  const sampled = negatives.filter((_, i) => i % stride === 0).slice(0, limit);
   return [...positives, ...sampled];
 }
 
 async function main() {
   console.log("══════════════════════════════════════════");
-  console.log("  RingWatch — Stage 5: Gradient Boosting Experiment");
+  console.log("  RingWatch — Stage 6: Graph + Gradient Boosting");
   console.log("══════════════════════════════════════════\n");
 
-  const train = await prisma.transaction.findMany({ where: { split: "TRAIN" }, select: { fromAccountId: true, toAccountId: true, amountPaid: true, amountReceived: true, paymentFormat: true, isLaunderingLabel: true } });
-  const test = await prisma.transaction.findMany({ where: { split: "TEST" }, select: { fromAccountId: true, toAccountId: true, amountPaid: true, amountReceived: true, paymentFormat: true, isLaunderingLabel: true } });
+  const select = {
+    fromAccountId: true,
+    toAccountId: true,
+    amountPaid: true,
+    amountReceived: true,
+    timestamp: true,
+    paymentFormat: true,
+    isLaunderingLabel: true,
+  } as const;
+
+  console.log("Loading TRAIN transactions...");
+  const train = await prisma.transaction.findMany({ where: { split: "TRAIN" }, select });
+  console.log("Loading TEST transactions...");
+  const test = await prisma.transaction.findMany({ where: { split: "TEST" }, select });
   console.log(`  TRAIN transactions: ${train.length.toLocaleString()}`);
   console.log(`  TEST transactions:  ${test.length.toLocaleString()}`);
 
@@ -75,22 +104,44 @@ async function main() {
   for (const tx of train) if (tx.isLaunderingLabel) { trainLabels.add(tx.fromAccountId); trainLabels.add(tx.toAccountId); }
   for (const tx of test) if (tx.isLaunderingLabel) { testLabels.add(tx.fromAccountId); testLabels.add(tx.toAccountId); }
 
-  const trainFeatures = buildFeatures(train);
-  const testFeatures = buildFeatures(test);
-  const allTrain = Array.from(trainFeatures.entries()).map(([accountId, f]) => ({ features: vector(f), label: trainLabels.has(accountId) ? 1 : 0 }));
-  const sampledTrain = sampleNegatives(allTrain, 20);
-  console.log(`  TRAIN accounts: ${allTrain.length.toLocaleString()}`);
-  console.log(`  Gradient boosting training sample: ${sampledTrain.length.toLocaleString()} (${sampledTrain.filter((e) => e.label === 1).length} positive, ${sampledTrain.filter((e) => e.label === 0).length} negative)`);
+  console.log("\nBuilding TRAIN graph features...");
+  const trainGraphData = buildGraph(train, percentile99(train.map((t) => t.amountPaid)));
+  const trainGraphFeatures = buildAccountGraphFeatures(train, trainGraphData.communities);
+  console.log(`  TRAIN communities: ${new Set(Object.values(trainGraphData.communities)).size.toLocaleString()}`);
 
-  console.log("\nTraining gradient-boosted trees...");
-  const model = trainGradientBoosting(sampledTrain.map((e) => e.features), sampledTrain.map((e) => e.label), { nEstimators: 60, learningRate: 0.05, maxDepth: 3, subsample: 0.8, maxFeatures: "sqrt", randomState: 42 });
+  console.log("Building TEST graph features...");
+  const testGraphData = buildGraph(test, percentile99(test.map((t) => t.amountPaid)));
+  const testGraphFeatures = buildAccountGraphFeatures(test, testGraphData.communities);
+  console.log(`  TEST communities: ${new Set(Object.values(testGraphData.communities)).size.toLocaleString()}`);
+
+  const trainBehavior = buildBehaviorFeatures(train);
+  const testBehavior = buildBehaviorFeatures(test);
+  const allTrain = Array.from(trainBehavior.entries()).map(([accountId, f]) => ({
+    features: vector(f, trainGraphFeatures.get(accountId) ?? { inDegree: 0, outDegree: 0, totalDegree: 0, communitySize: 1, communityDensity: 0, communityTriangleCount: 0, inOutAmountRatio: 0 }),
+    label: trainLabels.has(accountId) ? 1 : 0,
+  }));
+  const sampledTrain = sampleNegatives(allTrain, 20);
+
+  console.log(`  TRAIN accounts: ${allTrain.length.toLocaleString()}`);
+  console.log(`  Training sample: ${sampledTrain.length.toLocaleString()} (${sampledTrain.filter((e) => e.label === 1).length} positive, ${sampledTrain.filter((e) => e.label === 0).length} negative)`);
+
+  console.log("\nTraining gradient-boosted trees with graph + behavior features...");
+  const model = trainGradientBoosting(
+    sampledTrain.map((e) => e.features),
+    sampledTrain.map((e) => e.label),
+    { nEstimators: 80, learningRate: 0.04, maxDepth: 3, subsample: 0.8, maxFeatures: "sqrt", randomState: 42 }
+  );
 
   const trainProbabilities = predictGradientProbabilities(model, sampledTrain.map((e) => e.features));
   const selected = chooseThreshold(trainProbabilities, sampledTrain.map((e) => e.label as 0 | 1));
   console.log(`  Selected threshold from TRAIN: ${selected.threshold.toFixed(2)}`);
   console.log(`  TRAIN sample F1: ${(selected.f1 * 100).toFixed(2)}%`);
 
-  const testExamples = Array.from(testFeatures.entries()).map(([accountId, f]) => ({ features: vector(f), label: testLabels.has(accountId) ? 1 : 0 }));
+  const fallback = { inDegree: 0, outDegree: 0, totalDegree: 0, communitySize: 1, communityDensity: 0, communityTriangleCount: 0, inOutAmountRatio: 0 };
+  const testExamples = Array.from(testBehavior.entries()).map(([accountId, f]) => ({
+    features: vector(f, testGraphFeatures.get(accountId) ?? fallback),
+    label: testLabels.has(accountId) ? 1 : 0,
+  }));
   const testProbabilities = predictGradientProbabilities(model, testExamples.map((e) => e.features));
   const result = metrics(testProbabilities, testExamples.map((e) => e.label), selected.threshold);
 
@@ -102,7 +153,7 @@ async function main() {
   console.log(`  Precision: ${(result.precision * 100).toFixed(2)}%`);
   console.log(`  Recall:    ${(result.recall * 100).toFixed(2)}%`);
   console.log(`  F1:        ${(result.f1 * 100).toFixed(2)}%`);
-  console.log("\nGradient boosting experiment complete.");
+  console.log("\nGraph + gradient boosting experiment complete.");
   console.log("  TEST labels were not used to train or select the threshold.");
   await prisma.$disconnect();
 }
