@@ -166,11 +166,11 @@ selection.
 
 | Metric | Held-out value |
 | :--- | ---: |
-| **Precision** | **44.44%** |
-| **Recall** | **41.03%** |
-| **F1 Score** | **42.67%** |
-| True positives / false positives | 16 / 20 |
-| False negatives / true negatives | 23 / 99,941 |
+| **Precision** | **65.00%** |
+| **Recall** | **66.67%** |
+| **F1 Score** | **65.82%** |
+| True positives / false positives | 26 / 14 |
+| False negatives / true negatives | 13 / 99,947 |
 
 This benchmark uses 500,000 transactions with 193 labelled positive examples.
 It measures supervised pattern recognition when labelled history is available;
@@ -183,6 +183,14 @@ The original Louvain detector uses the earliest 80% of transactions for training
 and the latest 20% for testing. On the currently loaded data it scored 0.0% F1
 (0 TP, 12 FP, 167 FN, and 83,256 TN). This result is retained as an honest
 baseline, not presented as a production-quality model.
+
+### Live demo accounts
+
+The dashboard now loads valid account IDs from the latest TEST detection run
+for each available category (ring member, exposed merchant, and safe account).
+This replaces stale hard-coded placeholders in the account lookup bar, so the
+demo chips work on both seeded and pipeline-populated databases. A category is
+hidden when the latest run has no matching account.
 
 ---
 

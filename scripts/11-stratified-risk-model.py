@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import psycopg
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.metrics import precision_recall_curve, precision_score, recall_score, f1_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
@@ -132,7 +132,14 @@ def main() -> None:
     x_fit = transformer.fit_transform(feature_frame(fit, fit_history, fit_prior))
     x_validation = transformer.transform(feature_frame(validation, fit_history, fit_prior))
     positive_weight = (len(fit) - int(fit.is_laundering_label.sum())) / max(int(fit.is_laundering_label.sum()), 1)
-    model = HistGradientBoostingClassifier(max_iter=250, learning_rate=0.08, max_leaf_nodes=31, l2_regularization=1.0, random_state=RANDOM_STATE)
+    model = ExtraTreesClassifier(
+        n_estimators=200,
+        max_features=0.8,
+        min_samples_leaf=1,
+        class_weight="balanced",
+        n_jobs=-1,
+        random_state=RANDOM_STATE,
+    )
     model.fit(x_fit, fit.is_laundering_label.astype(int), sample_weight=np.where(fit.is_laundering_label, positive_weight, 1.0))
     threshold = choose_threshold(model.predict_proba(x_validation)[:, 1], validation.is_laundering_label.astype(int).to_numpy())
     print(f"Selected threshold on validation: {threshold:.6f}")
@@ -142,7 +149,14 @@ def main() -> None:
     x_development = transformer.fit_transform(feature_frame(development, development_history, development_prior))
     x_test = transformer.transform(feature_frame(test, development_history, development_prior))
     final_positive_weight = (len(development) - int(development.is_laundering_label.sum())) / max(int(development.is_laundering_label.sum()), 1)
-    final_model = HistGradientBoostingClassifier(max_iter=250, learning_rate=0.08, max_leaf_nodes=31, l2_regularization=1.0, random_state=RANDOM_STATE)
+    final_model = ExtraTreesClassifier(
+        n_estimators=200,
+        max_features=0.8,
+        min_samples_leaf=1,
+        class_weight="balanced",
+        n_jobs=-1,
+        random_state=RANDOM_STATE,
+    )
     final_model.fit(x_development, development.is_laundering_label.astype(int), sample_weight=np.where(development.is_laundering_label, final_positive_weight, 1.0))
     print_metrics(
         "HELD-OUT STRATIFIED TEST",

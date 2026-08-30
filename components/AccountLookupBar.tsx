@@ -9,7 +9,7 @@
  *   🔵 300_1000  — Safe Account
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, AlertTriangle, ShieldCheck, AlertCircle, X, Sparkles, ArrowRight } from "lucide-react";
 
 interface LookupResult {
@@ -31,11 +31,13 @@ interface LookupResult {
   };
 }
 
-const DEMO_CHIPS = [
-  { id: "PASTE_RING_MEMBER_ID_HERE", label: "Ring Member", color: "bg-red-500/10 text-red-400 border-red-500/40 hover:bg-red-500/20 shadow-sm shadow-red-500/10" },
-  { id: "PASTE_EXPOSED_MERCHANT_ID_HERE", label: "Exposed Merchant", color: "bg-amber-500/10 text-amber-400 border-amber-500/40 hover:bg-amber-500/20 shadow-sm shadow-amber-500/10" },
-  { id: "PASTE_SAFE_ACCOUNT_ID_HERE", label: "Safe Account", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/20 shadow-sm shadow-emerald-500/10" },
-];
+const DEMO_CHIP_CONFIG = [
+  { key: "ringMember", label: "Ring Member", color: "bg-red-500/10 text-red-400 border-red-500/40 hover:bg-red-500/20 shadow-sm shadow-red-500/10" },
+  { key: "exposedMerchant", label: "Exposed Merchant", color: "bg-amber-500/10 text-amber-400 border-amber-500/40 hover:bg-amber-500/20 shadow-sm shadow-amber-500/10" },
+  { key: "safeAccount", label: "Safe Account", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/20 shadow-sm shadow-emerald-500/10" },
+] as const;
+
+type DemoAccounts = Record<(typeof DEMO_CHIP_CONFIG)[number]["key"], string | null>;
 
 interface AccountLookupBarProps {
   onAccountFocus?: (accountId: string) => void;
@@ -45,6 +47,16 @@ export default function AccountLookupBar({ onAccountFocus }: AccountLookupBarPro
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<LookupResult | null>(null);
+  const [demoAccounts, setDemoAccounts] = useState<DemoAccounts | null>(null);
+
+  useEffect(() => {
+    fetch("/api/demo-accounts")
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (data && !data.error) setDemoAccounts(data);
+      })
+      .catch(() => undefined);
+  }, []);
 
   async function handleSearch(targetId?: string) {
     const searchId = (targetId ?? query).trim();
@@ -116,19 +128,23 @@ export default function AccountLookupBar({ onAccountFocus }: AccountLookupBarPro
           {/* Quick Demo Chips */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-slate-400 text-[11px] font-semibold uppercase tracking-wider">Live Demo Chips:</span>
-            {DEMO_CHIPS.map((chip) => (
+            {DEMO_CHIP_CONFIG.map((chip) => {
+              const accountId = demoAccounts?.[chip.key];
+              if (!accountId) return null;
+              return (
               <button
-                key={chip.id}
+                key={chip.key}
                 onClick={() => {
-                  setQuery(chip.id);
-                  handleSearch(chip.id);
+                  setQuery(accountId);
+                  handleSearch(accountId);
                 }}
                 className={`text-xs px-3 py-1 rounded-full border transition-all flex items-center gap-1.5 font-medium ${chip.color}`}
               >
-                <span className="font-mono font-bold">{chip.id}</span>
+                <span className="font-mono font-bold">{accountId}</span>
                 <span className="opacity-80">({chip.label})</span>
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
