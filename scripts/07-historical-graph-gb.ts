@@ -13,7 +13,7 @@ function metrics(p:number[],l:number[],t:number){let tp=0,fp=0,fn=0,tn=0;for(let
 function sampleNegatives(xs:{features:number[];label:number}[],ratio:number){const p=xs.filter(x=>x.label===1),n=xs.filter(x=>x.label===0),limit=Math.max(1,p.length*ratio),stride=Math.max(1,Math.ceil(n.length/limit));return[...p,...n.filter((_,i)=>i%stride===0).slice(0,limit)];}
 async function main(){
  console.log("══════════════════════════════════════════");console.log(" RingWatch — Stage 7: Historical Graph + Gradient Boosting");console.log("══════════════════════════════════════════\n");
- const select={fromAccountId:true,toAccountId:true,amountPaid:true,amountReceived:true,paymentFormat:true,isLaunderingLabel:true} as const;
+ const select={fromAccountId:true,toAccountId:true,amountPaid:true,amountReceived:true,timestamp:true,paymentFormat:true,isLaunderingLabel:true} as const;
  const train=await prisma.transaction.findMany({where:{split:"TRAIN"},select});const test=await prisma.transaction.findMany({where:{split:"TEST"},select});
  console.log(` TRAIN transactions: ${train.length.toLocaleString()}`);console.log(` TEST transactions:  ${test.length.toLocaleString()}`);
  const trainLabels=new Set<string>(),testLabels=new Set<string>();for(const t of train)if(t.isLaunderingLabel){trainLabels.add(t.fromAccountId);trainLabels.add(t.toAccountId);}for(const t of test)if(t.isLaunderingLabel){testLabels.add(t.fromAccountId);testLabels.add(t.toAccountId);}
@@ -22,7 +22,6 @@ async function main(){
  console.log(` TRAIN accounts: ${trainAll.length.toLocaleString()}`);console.log(` Training sample: ${sampled.length.toLocaleString()} (${sampled.filter(x=>x.label===1).length} positive, ${sampled.filter(x=>x.label===0).length} negative)`);
  console.log("\nTraining gradient-boosted trees...");const model=trainGradientBoosting(sampled.map(x=>x.features),sampled.map(x=>x.label),{nEstimators:80,learningRate:0.04,maxDepth:3,subsample:0.8,maxFeatures:"sqrt",randomState:42});
  const trainP=predictGradientProbabilities(model,sampled.map(x=>x.features));const selected=chooseThreshold(trainP,sampled.map(x=>x.label as 0|1));console.log(` Selected threshold from TRAIN: ${selected.threshold.toFixed(2)}`);console.log(` TRAIN sample F1: ${(selected.f1*100).toFixed(2)}%`);
- // Crucial: structural features for TEST come from TRAIN history. Only TEST-period behavior is observed for the prediction.
  const testRows=Array.from(vb.entries()).map(([id,b])=>({features:vector(b,gf.get(id)??fallback),label:testLabels.has(id)?1:0}));const testP=predictGradientProbabilities(model,testRows.map(x=>x.features));const r=metrics(testP,testRows.map(x=>x.label),selected.threshold);
  console.log("\n════════ TEST SET (HELD OUT) ════════");console.log(` TP: ${r.tp}`);console.log(` FP: ${r.fp}`);console.log(` FN: ${r.fn}`);console.log(` TN: ${r.tn}`);console.log(` Precision: ${(r.precision*100).toFixed(2)}%`);console.log(` Recall:    ${(r.recall*100).toFixed(2)}%`);console.log(` F1:        ${(r.f1*100).toFixed(2)}%`);console.log("\nStage 7 complete: no TEST graph was built and TEST labels were not used for training/threshold selection.");await prisma.$disconnect();
 }
