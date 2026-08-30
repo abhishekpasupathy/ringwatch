@@ -58,6 +58,7 @@ export function fitLogisticRegression(
   options: {
     learningRate?: number;
     iterations?: number;
+    batchSize?: number;
     positiveClassWeight?: number;
     l2?: number;
   } = {}
@@ -69,18 +70,24 @@ export function fitLogisticRegression(
   const standardized = standardizeFeatures(features);
   const x = standardized.values;
   const learningRate = options.learningRate ?? 0.05;
-  const iterations = options.iterations ?? 1500;
+  const iterations = options.iterations ?? 400;
+  const batchSize = Math.min(options.batchSize ?? 4096, x.length);
   const positiveClassWeight = options.positiveClassWeight ?? 1;
   const l2 = options.l2 ?? 0.001;
   const width = x[0].length;
   const weights = new Array<number>(width).fill(0);
   let bias = 0;
 
+  // Mini-batch gradient descent keeps training practical on hundreds of thousands
+  // of accounts while cycling deterministically through the training matrix.
   for (let iteration = 0; iteration < iterations; iteration++) {
     const gradients = new Array<number>(width).fill(0);
     let biasGradient = 0;
+    const start = (iteration * batchSize) % x.length;
+    const count = Math.min(batchSize, x.length);
 
-    for (let i = 0; i < x.length; i++) {
+    for (let offset = 0; offset < count; offset++) {
+      const i = (start + offset) % x.length;
       const row = x[i];
       const label = labels[i];
       const probability = sigmoid(
@@ -93,7 +100,7 @@ export function fitLogisticRegression(
       biasGradient += error;
     }
 
-    const scale = 1 / x.length;
+    const scale = 1 / count;
     for (let j = 0; j < width; j++) {
       weights[j] -= learningRate * (gradients[j] * scale + l2 * weights[j]);
     }
