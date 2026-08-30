@@ -5,6 +5,9 @@ import { buildGraph, percentile99 } from "../lib/graph-builder";
 import { scoreAllCommunities } from "../lib/detector";
 import { evaluate, formatEvalReport } from "../lib/evaluator";
 
+const CLUSTER_BATCH_SIZE = 500;
+const MEMBER_BATCH_SIZE = 2_000;
+
 async function main() {
   console.log("══════════════════════════════════════════");
   console.log("  RingWatch — Stage 3: Test Evaluation");
@@ -106,9 +109,10 @@ async function main() {
     data: { split: "TEST", threshold: trainRun.threshold, modularityScore },
   });
 
-  for (const comm of finalScored) {
-    const cluster = await prisma.cluster.create({
-      data: {
+  for (let i = 0; i < finalScored.length; i += CLUSTER_BATCH_SIZE) {
+    const batch = finalScored.slice(i, i + CLUSTER_BATCH_SIZE);
+    await prisma.cluster.createMany({
+      data: batch.map((comm) => ({
         runId: testRun.id,
         communityId: comm.communityId,
         isFlagged: comm.isFlagged,
@@ -119,15 +123,31 @@ async function main() {
         memberCount: comm.memberCount,
         illicitMemberCount: comm.illicitMemberCount,
         licitMemberCount: comm.licitMemberCount,
-      },
-    });
-    await prisma.clusterMember.createMany({
-      data: comm.members.map((accountId) => ({
-        clusterId: cluster.id,
-        accountId,
-        isIllicit: testIllicitSet.has(accountId),
-        isExposed: comm.isFlagged && !testIllicitSet.has(accountId),
       })),
+    });
+  }
+
+  const persistedClusters = await prisma.cluster.findMany({
+    where: { runId: testRun.id },
+    select: { id: true, communityId: true },
+  });
+  const clusterIdByCommunity = new Map(
+    persistedClusters.map((cluster) => [cluster.communityId, cluster.id])
+  );
+  const memberRows = finalScored.flatMap((comm) => {
+    const clusterId = clusterIdByCommunity.get(comm.communityId);
+    if (!clusterId) throw new Error(`Missing persisted cluster for community ${comm.communityId}`);
+    return comm.members.map((accountId) => ({
+      clusterId,
+      accountId,
+      isIllicit: testIllicitSet.has(accountId),
+      isExposed: comm.isFlagged && !testIllicitSet.has(accountId),
+    }));
+  });
+
+  for (let i = 0; i < memberRows.length; i += MEMBER_BATCH_SIZE) {
+    await prisma.clusterMember.createMany({
+      data: memberRows.slice(i, i + MEMBER_BATCH_SIZE),
       skipDuplicates: true,
     });
   }

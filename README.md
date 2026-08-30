@@ -154,16 +154,35 @@ gantt
 
 ---
 
-## 📊 Measured Performance on Held-Out Test Set
+## 📊 Measured Performance
 
-The model was tuned **ONLY on the TRAIN split** (earliest 80% by timestamp) and evaluated **ONLY on the held-out TEST split** (latest 20%).
+### Supervised transaction-risk benchmark
 
-| Metric | Measured Value | Rationale & Trade-Off |
-| :--- | :--- | :--- |
-| **Precision** | **Measured on TEST** | High precision minimizes unnecessary merchant friction. |
-| **Recall** | **Tuned for High Recall** | Prioritized over precision because an undetected ring chargeback is an unrecoverable financial loss (goods shipped + fee), whereas a false positive is a temporary 2-day hold. |
-| **F1 Score** | **Optimal Threshold** | Selected at max F1 during offline train threshold sweep. |
-| **False-Positive Cost** | **Quantified in INR/USD** | Calculated directly from test FP count: `FP_Count × Avg_Daily_Vol × 2-Day Hold`. |
+The current best reproducible benchmark is a scikit-learn histogram gradient-
+boosting classifier evaluated on a deterministic **stratified 60/20/20**
+transaction split (random seed 42). The threshold is chosen on validation only;
+the final test partition is not used for training, feature history, or threshold
+selection.
+
+| Metric | Held-out value |
+| :--- | ---: |
+| **Precision** | **44.44%** |
+| **Recall** | **41.03%** |
+| **F1 Score** | **42.67%** |
+| True positives / false positives | 16 / 20 |
+| False negatives / true negatives | 23 / 99,941 |
+
+This benchmark uses 500,000 transactions with 193 labelled positive examples.
+It measures supervised pattern recognition when labelled history is available;
+it is **not** a forward-in-time deployment metric. The complete protocol and
+confusion matrix are in [BENCHMARK.md](BENCHMARK.md).
+
+### Temporal graph-detector baseline
+
+The original Louvain detector uses the earliest 80% of transactions for training
+and the latest 20% for testing. On the currently loaded data it scored 0.0% F1
+(0 TP, 12 FP, 167 FN, and 83,256 TN). This result is retained as an honest
+baseline, not presented as a production-quality model.
 
 ---
 
@@ -200,6 +219,7 @@ The model was tuned **ONLY on the TRAIN split** (earliest 80% by timestamp) and 
 
 ### Prerequisites
 - Node.js 20+
+- Python 3.11+ (for the supervised benchmark)
 - A free [Neon Postgres](https://neon.tech) database
 - A free [Groq API](https://console.groq.com) key
 
@@ -225,7 +245,16 @@ npm run db:generate
 npm run pipeline
 ```
 
-### 4. Launch Dashboard
+### 4. Run the supervised benchmark
+
+```bash
+python3 -m pip install -r requirements.txt
+npm run ml:stratified
+```
+
+This prints the stratified held-out precision, recall, and F1 documented above.
+
+### 5. Launch Dashboard
 ```bash
 npm run dev
 # Open http://localhost:3000
