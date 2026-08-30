@@ -3,22 +3,6 @@
  *
  * Downloads the IBM AML HI-Small dataset from Kaggle (or reads from ./data/)
  * and ingests it into Neon Postgres via Prisma.
- *
- * IBM AML HI-Small_Trans.csv columns:
- *   0: Timestamp, 1: From Bank, 2: Account (from), 3: To Bank,
- *   4: Account.1 (to), 5: Amount Received, 6: Receiving Currency,
- *   7: Amount Paid, 8: Payment Currency, 9: Payment Format, 10: Is Laundering
- *
- * Schema mapping:
- *   accounts.id = "<bank>_<accountNum>" (composite to ensure global uniqueness)
- *   accounts.isIllicitLabel = true if ANY transaction from/to this account
- *     has Is Laundering = 1  (derived label, not in source)
- *   transactions mirror the CSV row directly.
- *
- * NOTE: The "protected merchant" framing maps licit accounts that transact
- * with illicit-labeled accounts as "exposed merchants." This is a schematic
- * projection onto the IBM AML schema, which has accounts, not merchants.
- * This is acknowledged explicitly in the README and code comments.
  */
 
 import { PrismaClient } from "@prisma/client";
@@ -26,6 +10,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as readline from "readline";
 import { execSync } from "child_process";
+import { retryDatabaseOperation } from "../lib/retry-db";
 
 const prisma = new PrismaClient();
 
@@ -33,7 +18,9 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const CSV_FILENAME = "HI-Small_Trans.csv";
 const CSV_PATH = path.join(DATA_DIR, CSV_FILENAME);
 
-const BATCH_SIZE = 500; // keep under Neon connection statement limits
+// Small batches avoid oversized statements. Transient Neon disconnects are
+// retried by retryDatabaseOperation so a long ingestion can resume safely.
+const BATCH_SIZE = 500;
 
 interface RawRow {
   timestamp: string;
@@ -46,7 +33,7 @@ interface RawRow {
   amountPaid: number;
   paymentCurrency: string;
   paymentFormat: string;
-  isLaundering: number; // 0 or 1
+  isLaundering: number;
 }
 
 async function downloadIfMissing() {
@@ -84,7 +71,7 @@ async function parseCSV(): Promise<RawRow[]> {
   let lineNum = 0;
   for await (const line of rl) {
     lineNum++;
-    if (lineNum === 1) continue; // skip header
+    if (lineNum === 1) continue;
 
     const parts = line.split(",");
     if (parts.length < 11) continue;
@@ -138,7 +125,6 @@ async function deriveAccounts(rows: RawRow[]): Promise<
       });
     }
 
-    // Mark illicit: if ANY transaction involving this account is laundering
     if (row.isLaundering === 1) {
       accounts.get(fromId)!.isIllicit = true;
       accounts.get(toId)!.isIllicit = true;
@@ -155,15 +141,20 @@ async function ingestAccounts(
 
   for (let i = 0; i < entries.length; i += BATCH_SIZE) {
     const batch = entries.slice(i, i + BATCH_SIZE);
-    await prisma.account.createMany({
-      data: batch.map(([id, a]) => ({
-        id,
-        bank: a.bank,
-        accountNum: a.accountNum,
-        isIllicitLabel: a.isIllicit,
-      })),
-      skipDuplicates: true,
-    });
+    await retryDatabaseOperation(
+      () =>
+        prisma.account.createMany({
+          data: batch.map(([id, a]) => ({
+            id,
+            bank: a.bank,
+            accountNum: a.accountNum,
+            isIllicitLabel: a.isIllicit,
+          })),
+          skipDuplicates: true,
+        }),
+      { retries: 5, baseDelayMs: 1000 }
+    );
+
     process.stdout.write(
       `  Accounts: ${Math.min(i + BATCH_SIZE, entries.length).toLocaleString()} / ${entries.length.toLocaleString()}\r`
     );
@@ -176,21 +167,26 @@ async function ingestTransactions(rows: RawRow[]) {
 
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE);
-    await prisma.transaction.createMany({
-      data: batch.map((r) => ({
-        fromAccountId: `${r.fromBank}_${r.fromAccount}`,
-        toAccountId: `${r.toBank}_${r.toAccount}`,
-        amountPaid: r.amountPaid,
-        amountReceived: r.amountReceived,
-        paymentCurrency: r.paymentCurrency,
-        receivingCurrency: r.receivingCurrency,
-        paymentFormat: r.paymentFormat,
-        timestamp: new Date(r.timestamp),
-        isLaunderingLabel: r.isLaundering === 1,
-        split: "TRAIN", // default; will be updated by 02-split.ts
-      })),
-      skipDuplicates: true,
-    });
+    await retryDatabaseOperation(
+      () =>
+        prisma.transaction.createMany({
+          data: batch.map((r) => ({
+            fromAccountId: `${r.fromBank}_${r.fromAccount}`,
+            toAccountId: `${r.toBank}_${r.toAccount}`,
+            amountPaid: r.amountPaid,
+            amountReceived: r.amountReceived,
+            paymentCurrency: r.paymentCurrency,
+            receivingCurrency: r.receivingCurrency,
+            paymentFormat: r.paymentFormat,
+            timestamp: new Date(r.timestamp),
+            isLaunderingLabel: r.isLaundering === 1,
+            split: "TRAIN",
+          })),
+          skipDuplicates: true,
+        }),
+      { retries: 5, baseDelayMs: 1000 }
+    );
+
     if (i % 50_000 === 0) {
       process.stdout.write(
         `  Transactions: ${Math.min(i + BATCH_SIZE, rows.length).toLocaleString()} / ${rows.length.toLocaleString()}\r`
