@@ -1,6 +1,6 @@
 import prisma from "../lib/db";
 import { buildGraph, percentile99 } from "../lib/graph-builder";
-import { buildAccountGraphFeatures } from "../lib/account-graph-features";
+import { buildAccountGraphFeatures, type AccountGraphFeatures } from "../lib/account-graph-features";
 import { chooseThreshold } from "../lib/ml-detector";
 import { predictGradientProbabilities, trainGradientBoosting } from "../lib/gradient-boosting-detector";
 
@@ -34,7 +34,7 @@ function buildBehaviorFeatures(transactions: {
   return result;
 }
 
-function vector(behavior: AccountFeatures, graph: ReturnType<typeof buildAccountGraphFeatures> extends Map<string, infer T> ? T : never): number[] {
+function vector(behavior: AccountFeatures, graph: AccountGraphFeatures): number[] {
   return [
     Math.log1p(behavior.txCount),
     Math.log1p(behavior.incomingCount),
@@ -116,8 +116,9 @@ async function main() {
 
   const trainBehavior = buildBehaviorFeatures(train);
   const testBehavior = buildBehaviorFeatures(test);
+  const fallback: AccountGraphFeatures = { inDegree: 0, outDegree: 0, totalDegree: 0, communitySize: 1, communityDensity: 0, communityTriangleCount: 0, inOutAmountRatio: 0 };
   const allTrain = Array.from(trainBehavior.entries()).map(([accountId, f]) => ({
-    features: vector(f, trainGraphFeatures.get(accountId) ?? { inDegree: 0, outDegree: 0, totalDegree: 0, communitySize: 1, communityDensity: 0, communityTriangleCount: 0, inOutAmountRatio: 0 }),
+    features: vector(f, trainGraphFeatures.get(accountId) ?? fallback),
     label: trainLabels.has(accountId) ? 1 : 0,
   }));
   const sampledTrain = sampleNegatives(allTrain, 20);
@@ -137,7 +138,6 @@ async function main() {
   console.log(`  Selected threshold from TRAIN: ${selected.threshold.toFixed(2)}`);
   console.log(`  TRAIN sample F1: ${(selected.f1 * 100).toFixed(2)}%`);
 
-  const fallback = { inDegree: 0, outDegree: 0, totalDegree: 0, communitySize: 1, communityDensity: 0, communityTriangleCount: 0, inOutAmountRatio: 0 };
   const testExamples = Array.from(testBehavior.entries()).map(([accountId, f]) => ({
     features: vector(f, testGraphFeatures.get(accountId) ?? fallback),
     label: testLabels.has(accountId) ? 1 : 0,
