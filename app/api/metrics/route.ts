@@ -10,6 +10,7 @@
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { ensureDataSeeded } from "@/lib/auto-seed";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +20,18 @@ export async function GET() {
       return NextResponse.json({ error: "DATABASE_URL not configured" }, { status: 500 });
     }
 
-    const m = await prisma.evalMetrics.findFirst({
+    let m = await prisma.evalMetrics.findFirst({
       where: { split: "TEST" },
       orderBy: { runAt: "desc" },
     });
+
+    if (!m) {
+      await ensureDataSeeded();
+      m = await prisma.evalMetrics.findFirst({
+        where: { split: "TEST" },
+        orderBy: { runAt: "desc" },
+      });
+    }
 
     if (!m) {
       return NextResponse.json(

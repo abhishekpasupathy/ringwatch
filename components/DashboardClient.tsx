@@ -25,8 +25,30 @@ export default function DashboardClient() {
   const graphRef = useRef<ForceGraphHandle>(null);
 
   useEffect(() => {
-    fetch("/api/graph").then(r => r.json()).then(data => data.error ? setGraphError(data.error) : setGraphData(data)).catch(() => setGraphError("Failed to load graph data")).finally(() => setGraphLoading(false));
-    fetch("/api/metrics").then(r => r.json()).then(data => { if (!data.error) setMetrics(data); }).catch(() => {}).finally(() => setMetricsLoading(false));
+    async function loadDashboard() {
+      try {
+        // The graph route can seed an empty database. Wait for it before
+        // requesting metrics so a first visit does not show a false 404.
+        const graphResponse = await fetch("/api/graph");
+        const graph = await graphResponse.json();
+        if (graph.error) setGraphError(graph.error);
+        else setGraphData(graph);
+      } catch {
+        setGraphError("Failed to load graph data");
+      } finally {
+        setGraphLoading(false);
+      }
+
+      try {
+        const metricsResponse = await fetch("/api/metrics");
+        const metricsData = await metricsResponse.json();
+        if (!metricsData.error) setMetrics(metricsData);
+      } finally {
+        setMetricsLoading(false);
+      }
+    }
+
+    void loadDashboard();
   }, []);
 
   const handleAccountFocus = useCallback((accountId: string) => {

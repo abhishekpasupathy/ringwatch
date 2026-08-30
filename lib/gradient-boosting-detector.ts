@@ -1,3 +1,5 @@
+import { Ensemble } from "@kanaries/ml";
+
 export interface GradientBoostingModel {
   model: unknown;
   featureCount: number;
@@ -15,9 +17,6 @@ export function trainGradientBoosting(
     randomState?: number;
   } = {}
 ): GradientBoostingModel {
-  // Loaded dynamically so the core app does not need to import the ML package.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { Ensemble } = require("@kanaries/ml");
   const model = new Ensemble.GradientBoostingClassifier({
     nEstimators: options.nEstimators ?? 60,
     learningRate: options.learningRate ?? 0.05,
