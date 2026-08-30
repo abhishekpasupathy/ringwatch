@@ -104,7 +104,6 @@ async function parseCSV(maxRows?: number): Promise<RawRow[]> {
         receivingCurrency: parts[6].trim(),
         amountPaid: parseFloat(parts[7].trim()),
         paymentCurrency: parts[8].trim(),
-        amountPaid: parseFloat(parts[7].trim()),
         paymentFormat: parts[9].trim(),
         isLaundering: parseInt(parts[10].trim(), 10),
       });
