@@ -1,46 +1,19 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ShieldCheck, AlertTriangle, Eye, Zap } from "lucide-react";
-import ForceGraphWrapper, {
-  GraphNode,
-  GraphLink,
-  ForceGraphHandle,
-} from "@/components/ForceGraphWrapper";
+import { ShieldCheck, AlertTriangle, Eye, Zap, Activity, Search, Network, Target } from "lucide-react";
+import ForceGraphWrapper, { GraphNode, GraphLink, ForceGraphHandle } from "@/components/ForceGraphWrapper";
 import NodeInspectorPanel from "@/components/NodeInspectorPanel";
 import MetricsPanel from "@/components/MetricsPanel";
 import AccountLookupBar from "@/components/AccountLookupBar";
 
-interface GraphData {
-  nodes: GraphNode[];
-  links: GraphLink[];
-  clusters: ClusterData[];
-}
-
+interface GraphData { nodes: GraphNode[]; links: GraphLink[]; clusters: ClusterData[]; }
 interface ClusterData {
-  id: number;
-  communityId: number;
-  isFlagged: boolean;
-  suspicionTier: "HIGH" | "MEDIUM" | "SAFE";
-  memberCount: number;
-  illicitMemberCount: number;
-  licitMemberCount: number;
-  internalEdgeDensity: "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH";
-  timeBurstPresent: boolean;
-  paymentFormatCount: number;
+  id: number; communityId: number; isFlagged: boolean; suspicionTier: "HIGH" | "MEDIUM" | "SAFE";
+  memberCount: number; illicitMemberCount: number; licitMemberCount: number;
+  internalEdgeDensity: "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH"; timeBurstPresent: boolean; paymentFormatCount: number;
 }
-
-interface MetricsData {
-  tp: number;
-  fp: number;
-  fn: number;
-  tn: number;
-  precision: number;
-  recall: number;
-  f1: number;
-  fpCostNote: string;
-  computedAt: string;
-}
+interface MetricsData { tp: number; fp: number; fn: number; tn: number; precision: number; recall: number; f1: number; fpCostNote: string; computedAt: string; }
 
 export default function DashboardClient() {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
@@ -52,205 +25,99 @@ export default function DashboardClient() {
   const graphRef = useRef<ForceGraphHandle>(null);
 
   useEffect(() => {
-    fetch("/api/graph")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) {
-          setGraphError(data.error);
-        } else {
-          setGraphData(data);
-        }
-      })
-      .catch(() => setGraphError("Failed to load graph data"))
-      .finally(() => setGraphLoading(false));
-
-    fetch("/api/metrics")
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.error) setMetrics(data);
-      })
-      .catch(() => {})
-      .finally(() => setMetricsLoading(false));
+    fetch("/api/graph").then(r => r.json()).then(data => data.error ? setGraphError(data.error) : setGraphData(data)).catch(() => setGraphError("Failed to load graph data")).finally(() => setGraphLoading(false));
+    fetch("/api/metrics").then(r => r.json()).then(data => { if (!data.error) setMetrics(data); }).catch(() => {}).finally(() => setMetricsLoading(false));
   }, []);
 
-  function handleNodeClick(node: GraphNode) {
-    setSelectedNode(node);
-  }
+  const handleAccountFocus = useCallback((accountId: string) => {
+    if (!graphData) return;
+    const node = graphData.nodes.find(n => n.id === accountId);
+    if (node) { setSelectedNode(node); setTimeout(() => graphRef.current?.focusNode(accountId), 100); }
+  }, [graphData]);
 
-  const handleAccountFocus = useCallback(
-    (accountId: string) => {
-      if (!graphData) return;
-      const node = graphData.nodes.find((n) => n.id === accountId);
-      if (node) {
-        setSelectedNode(node);
-        // Small delay to ensure graph ref is ready after layout
-        setTimeout(() => graphRef.current?.focusNode(accountId), 100);
-      }
-    },
-    [graphData]
-  );
-
-  const flaggedCount = graphData?.clusters.filter((c) => c.isFlagged).length ?? 0;
-  const highRiskCount =
-    graphData?.clusters.filter((c) => c.suspicionTier === "HIGH").length ?? 0;
-  const exposedCount = graphData?.nodes.filter((n) => n.isExposed).length ?? 0;
+  const flaggedCount = graphData?.clusters.filter(c => c.isFlagged).length ?? 0;
+  const highRiskCount = graphData?.clusters.filter(c => c.suspicionTier === "HIGH").length ?? 0;
+  const exposedCount = graphData?.nodes.filter(n => n.isExposed).length ?? 0;
+  const accountCount = graphData?.nodes.length ?? 0;
 
   return (
-    <div className="flex flex-col h-screen bg-[#07090e] text-white font-sans overflow-hidden">
-      {/* ── Top Tactical Header & Stat Bar ───────────────────────────────── */}
-      <header className="flex-shrink-0 flex flex-col md:flex-row items-stretch md:items-center justify-between px-6 py-3 border-b border-white/10 bg-[#090d16]/90 backdrop-blur-md z-10 gap-3">
-        {/* Brand Title */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-shrink-0">
-            <div className="w-9 h-9 bg-teal-500/15 border border-teal-500/30 rounded-xl flex items-center justify-center glow-teal-sm">
-              <Eye size={18} className="text-teal-400" />
+    <div className="dashboard-shell flex flex-col h-screen text-white overflow-hidden">
+      <header className="flex-shrink-0 border-b border-white/[.07] bg-[#070a0f]/95 backdrop-blur-xl z-30">
+        <div className="h-[58px] px-5 lg:px-7 flex items-center justify-between gap-5">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative w-9 h-9 rounded-xl border border-teal-400/25 bg-teal-400/[.07] flex items-center justify-center">
+              <Eye size={18} className="text-teal-300" />
+              <span className="absolute -right-0.5 -top-0.5 w-2 h-2 rounded-full bg-teal-300 pulse-indicator" />
             </div>
-            <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-teal-400 rounded-full pulse-indicator" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="font-extrabold text-[15px] tracking-tight">RingWatch</h1>
+                <span className="hidden sm:inline text-[9px] font-mono font-bold tracking-[.16em] text-teal-300/90 uppercase">Fraud intelligence</span>
+              </div>
+              <p className="text-[10px] text-slate-500 font-mono truncate">NETWORK ANALYSIS / IBM AML HI-SMALL</p>
+            </div>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-white font-extrabold text-base tracking-tight font-heading">
-                RingWatch
-              </h1>
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-teal-400 bg-teal-500/10 border border-teal-500/25 px-2 py-0.5 rounded-full">
-                Sentinel v1.0
-              </span>
-            </div>
-            <p className="text-slate-400 text-xs font-mono">
-              Abuse-Ring Fraud Sentinel · IBM AML HI-Small
-            </p>
+          <div className="flex items-center gap-3 text-[10px] font-mono">
+            <div className="hidden md:flex items-center gap-2 text-slate-500"><Activity size={13} className="text-teal-400" /> ANALYSIS ENGINE <span className="text-teal-300">ONLINE</span></div>
+            <div className="h-5 w-px bg-white/[.08] hidden md:block" />
+            <div className="flex items-center gap-2 text-slate-400"><span className="w-1.5 h-1.5 rounded-full bg-teal-400" /> LIVE</div>
           </div>
         </div>
-
-        {/* Top Summary Stat Cards Bar */}
-        <div className="flex items-center gap-2 flex-wrap md:flex-nowrap">
-          {/* Rings Detected */}
-          <div className="glass-card px-3.5 py-1.5 rounded-xl flex items-center gap-2 border-red-500/30">
-            <AlertTriangle size={15} className="text-red-400" />
-            <div>
-              <div className="text-slate-400 text-[9px] font-bold uppercase tracking-wider">Rings Flagged</div>
-              <div className="text-red-400 font-extrabold text-sm font-mono-stat">{flaggedCount}</div>
-            </div>
-          </div>
-
-          {/* High Risk */}
-          <div className="glass-card px-3.5 py-1.5 rounded-xl flex items-center gap-2 border-amber-500/30">
-            <Zap size={15} className="text-amber-400" />
-            <div>
-              <div className="text-slate-400 text-[9px] font-bold uppercase tracking-wider">High Risk</div>
-              <div className="text-amber-400 font-extrabold text-sm font-mono-stat">{highRiskCount}</div>
-            </div>
-          </div>
-
-          {/* Merchants Protected */}
-          <div className="glass-card px-3.5 py-1.5 rounded-xl flex items-center gap-2 border-teal-500/30">
-            <ShieldCheck size={15} className="text-teal-400" />
-            <div>
-              <div className="text-slate-400 text-[9px] font-bold uppercase tracking-wider">Merchants Protected</div>
-              <div className="text-teal-400 font-extrabold text-sm font-mono-stat">{exposedCount}</div>
-            </div>
-          </div>
-
-          {/* Evaluation Stat Pills */}
-          {metrics && (
-            <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
-              <div className="glass-card px-2.5 py-1.5 rounded-xl text-center min-w-[55px]">
-                <div className="text-slate-400 text-[9px] font-bold uppercase">Prec</div>
-                <div className="text-teal-400 font-bold text-xs font-mono-stat">
-                  {(metrics.precision * 100).toFixed(0)}%
-                </div>
-              </div>
-              <div className="glass-card px-2.5 py-1.5 rounded-xl text-center min-w-[55px]">
-                <div className="text-slate-400 text-[9px] font-bold uppercase">Rec</div>
-                <div className="text-teal-400 font-bold text-xs font-mono-stat">
-                  {(metrics.recall * 100).toFixed(0)}%
-                </div>
-              </div>
-              <div className="glass-card px-2.5 py-1.5 rounded-xl text-center min-w-[55px]">
-                <div className="text-slate-400 text-[9px] font-bold uppercase">F1</div>
-                <div className="text-teal-300 font-bold text-xs font-mono-stat">
-                  {(metrics.f1 * 100).toFixed(0)}%
-                </div>
-              </div>
-            </div>
-          )}
+        <div className="px-5 lg:px-7 pb-3 pt-1 grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <Metric label="Accounts analyzed" value={accountCount.toLocaleString()} icon={<Network size={14} />} />
+          <Metric label="Rings flagged" value={flaggedCount.toLocaleString()} icon={<AlertTriangle size={14} />} tone="red" />
+          <Metric label="High-risk communities" value={highRiskCount.toLocaleString()} icon={<Zap size={14} />} tone="amber" />
+          <Metric label="Exposed accounts" value={exposedCount.toLocaleString()} icon={<ShieldCheck size={14} />} />
         </div>
       </header>
 
-      {/* ── Live Account Lookup Bar ────────────────────────────────────────── */}
-      <AccountLookupBar onAccountFocus={handleAccountFocus} />
-
-      {/* ── Main Dashboard Workspace ───────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden relative">
-        {/* Force Graph Visualization */}
-        <div className="flex-1 relative bg-[#07090e] min-w-0">
-          {graphLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-[#07090e] z-20">
-              <div className="text-center">
-                <div className="w-10 h-10 border-2 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto mb-3 glow-teal-sm" />
-                <p className="text-slate-400 text-xs font-mono tracking-wider">LOADING GRAPH ENGINE…</p>
-              </div>
-            </div>
-          )}
-
-          {graphError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-[#07090e] z-20">
-              <div className="text-center max-w-sm glass-panel p-6 rounded-2xl border border-slate-800">
-                <AlertTriangle className="text-amber-400 mx-auto mb-3" size={32} />
-                <p className="text-slate-200 font-bold mb-1">Graph Data Unavailable</p>
-                <p className="text-slate-400 text-xs leading-relaxed">{graphError}</p>
-              </div>
-            </div>
-          )}
-
-          {graphData && !graphLoading && (
-            <>
-              {/* Tactical Legend Overlay */}
-              <div className="absolute top-4 left-4 z-10 glass-panel border border-white/10 rounded-xl p-3 shadow-2xl space-y-2">
-                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-                  Live Network Legend
-                </p>
-                {[
-                  { color: "bg-red-500 glow-red-sm ring-pulse-dot", label: "Ring Member (Illicit)" },
-                  { color: "bg-amber-500 glow-amber-sm", label: "Exposed Merchant (Licit)" },
-                  { color: "bg-blue-500 glow-teal-sm", label: "Safe Account" },
-                ].map(({ color, label }) => (
-                  <div key={label} className="flex items-center gap-2">
-                    <div className={`w-2.5 h-2.5 rounded-full ${color}`} />
-                    <span className="text-slate-300 text-xs font-medium">{label}</span>
-                  </div>
-                ))}
-                <p className="text-slate-400 text-[10px] pt-1 border-t border-white/5 italic">
-                  Hover to preview · Click to inspect
-                </p>
-              </div>
-
-              <ForceGraphWrapper
-                ref={graphRef}
-                nodes={graphData.nodes}
-                links={graphData.links}
-                onNodeClick={handleNodeClick}
-                selectedNodeId={selectedNode?.id}
-              />
-            </>
-          )}
-        </div>
-
-        {/* Node Inspector Panel (slides in on node click) */}
-        {selectedNode && (
-          <div className="w-80 flex-shrink-0 border-l border-white/10 z-20 overflow-hidden">
-            <NodeInspectorPanel
-              node={selectedNode}
-              onClose={() => setSelectedNode(null)}
-            />
-          </div>
-        )}
-
-        {/* Right: Metrics Panel */}
-        <div className="w-80 border-l border-white/10 bg-[#090d16]/95 flex-shrink-0 overflow-hidden">
-          <MetricsPanel metrics={metrics} loading={metricsLoading} />
-        </div>
+      <div className="flex-shrink-0 px-5 lg:px-7 py-2 border-b border-white/[.06] bg-[#080b11] flex items-center gap-3">
+        <div className="section-label hidden sm:flex items-center gap-2 whitespace-nowrap"><Search size={12} /> ACCOUNT SEARCH</div>
+        <div className="flex-1"><AccountLookupBar onAccountFocus={handleAccountFocus} /></div>
       </div>
+
+      <main className="flex-1 min-h-0 p-3 lg:p-4 flex gap-3 overflow-hidden">
+        <section className="flex-1 min-w-0 min-h-0 rounded-2xl border border-white/[.08] bg-[#080c12] overflow-hidden relative shadow-2xl">
+          <div className="absolute inset-x-0 top-0 h-14 z-10 pointer-events-none bg-gradient-to-b from-[#080c12] to-transparent" />
+          <div className="absolute top-4 left-4 z-20 glass-panel rounded-xl px-3 py-2.5 pointer-events-none">
+            <div className="flex items-center gap-2 mb-2"><Target size={13} className="text-teal-300" /><span className="section-label">Network map</span></div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[10px] text-slate-400">
+              <Legend color="bg-red-400" label="Illicit" glow="glow-red-sm" />
+              <Legend color="bg-amber-400" label="Exposed" glow="glow-amber-sm" />
+              <Legend color="bg-slate-500" label="Safe" />
+            </div>
+          </div>
+          <div className="absolute top-4 right-4 z-20 glass-panel rounded-xl px-3 py-2 text-right pointer-events-none">
+            <div className="section-label">Detection mode</div>
+            <div className="text-[11px] text-teal-300 font-mono mt-1">LOUVAIN / RISK SCORING</div>
+          </div>
+
+          {graphLoading && <div className="absolute inset-0 flex items-center justify-center bg-[#080c12] z-20"><div className="text-center"><div className="w-9 h-9 border-2 border-teal-300 border-t-transparent rounded-full animate-spin mx-auto mb-3" /><p className="text-slate-500 text-[10px] font-mono tracking-[.18em]">INITIALIZING NETWORK</p></div></div>}
+          {graphError && <div className="absolute inset-0 flex items-center justify-center bg-[#080c12] z-20"><div className="glass-panel rounded-2xl p-7 text-center max-w-sm"><AlertTriangle className="text-amber-300 mx-auto mb-3" size={28} /><p className="font-semibold text-slate-200 mb-1">Network unavailable</p><p className="text-slate-500 text-xs">{graphError}</p></div></div>}
+          {graphData && !graphLoading && <ForceGraphWrapper ref={graphRef} nodes={graphData.nodes} links={graphData.links} onNodeClick={setSelectedNode} selectedNodeId={selectedNode?.id} />}
+        </section>
+
+        <aside className="hidden xl:flex w-[330px] 2xl:w-[360px] flex-shrink-0 flex-col gap-3 min-h-0">
+          <div className="rounded-2xl border border-white/[.08] bg-[#0a0e14] overflow-hidden flex-1 min-h-0"><MetricsPanel metrics={metrics} loading={metricsLoading} /></div>
+          <div className="rounded-2xl border border-white/[.08] bg-[#0a0e14] p-4 flex-shrink-0">
+            <div className="flex items-center justify-between mb-3"><span className="section-label">Model health</span><span className="text-[9px] font-mono text-teal-300">RUNNING</span></div>
+            <div className="grid grid-cols-3 gap-2">
+              <Health label="PRECISION" value={metrics ? `${(metrics.precision * 100).toFixed(0)}%` : "—"} />
+              <Health label="RECALL" value={metrics ? `${(metrics.recall * 100).toFixed(0)}%` : "—"} />
+              <Health label="F1" value={metrics ? `${(metrics.f1 * 100).toFixed(0)}%` : "—"} />
+            </div>
+          </div>
+        </aside>
+
+        {selectedNode && <div className="absolute inset-y-3 right-3 z-30 w-[min(330px,calc(100%-24px))] rounded-2xl overflow-hidden border border-white/[.1] shadow-2xl slide-in-right"><NodeInspectorPanel node={selectedNode} onClose={() => setSelectedNode(null)} /></div>}
+      </main>
     </div>
   );
 }
+
+function Metric({ label, value, icon, tone = "teal" }: { label: string; value: string; icon: React.ReactNode; tone?: "teal" | "red" | "amber" }) {
+  const text = tone === "red" ? "text-red-300" : tone === "amber" ? "text-amber-300" : "text-teal-300";
+  return <div className="glass-card rounded-xl px-3.5 py-2.5 flex items-center gap-3"><div className={`${text} opacity-90`}>{icon}</div><div className="min-w-0"><div className="section-label mb-1">{label}</div><div className={`metric-number text-[15px] font-bold ${text}`}>{value}</div></div></div>;
+}
+function Legend({ color, label, glow = "" }: { color: string; label: string; glow?: string }) { return <div className="flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full ${color} ${glow}`} />{label}</div>; }
+function Health({ label, value }: { label: string; value: string }) { return <div className="rounded-lg bg-white/[.025] border border-white/[.06] p-2"><div className="text-[8px] font-mono text-slate-500 tracking-wider">{label}</div><div className="metric-number text-xs text-slate-200 mt-1">{value}</div></div>; }
