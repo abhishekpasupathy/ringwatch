@@ -3,7 +3,7 @@
 ## Stratified supervised transaction-risk model
 
 Run date: 2026-08-30  
-Command: `npm run ml:stratified`
+Commands: `npm run ml:stratified` and `npm run ml:recall-first`
 
 | Metric | Held-out value |
 |---|---:|
@@ -15,6 +15,23 @@ Command: `npm run ml:stratified`
 | False negatives | 13 |
 | True negatives | 99,947 |
 
+## Recall-first operating point
+
+| Metric | Held-out value |
+|---|---:|
+| Precision | 0.04% |
+| Recall | 100.00% |
+| F1 | 0.08% |
+| True positives | 39 |
+| False positives | 99,961 |
+| False negatives | 0 |
+| True negatives | 0 |
+
+The recall-first threshold is selected exclusively on validation to satisfy a
+100% recall target. On this dataset it is `0.0`, which means every transaction
+is placed in the review queue. It is useful only to demonstrate a catch-all
+triage mode; it is not a practical production operating point.
+
 ## Protocol
 
 - Dataset: 500,000 transaction rows, with 193 positive laundering labels.
@@ -22,7 +39,8 @@ Command: `npm run ml:stratified`
 - Fit: 300,000 transactions; validation: 100,000; held-out test: 100,000.
 - Model: scikit-learn `ExtraTreesClassifier` with transaction amount, time,
   payment-format, and smoothed account-history features.
-- Threshold: selected only on the validation partition.
+- Balanced threshold: selected for maximum F1 on the validation partition.
+- Recall-first threshold: highest threshold reaching 100% validation recall.
 - The held-out test labels are used only for final measurement. Test account
   label history is never used as a feature.
 

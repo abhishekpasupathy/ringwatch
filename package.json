@@ -17,6 +17,7 @@
     "ml:gb": "tsx scripts/06-gradient-boosting-train-evaluate.ts",
     "ml:tx": "tsx scripts/10-transaction-gb.ts",
     "ml:stratified": "python3 scripts/11-stratified-risk-model.py",
+    "ml:recall-first": "python3 scripts/11-stratified-risk-model.py --target-recall 1.0",
     "test:detector": "tsx scripts/detector-regression-test.ts",
     "test:ingest": "tsx scripts/ingest-resilience-test.ts",
     "test:ml": "tsx scripts/ml-regression-test.ts",

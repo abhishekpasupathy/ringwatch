@@ -9,6 +9,7 @@ be presented as a forward-in-time deployment metric.
 from __future__ import annotations
 
 import os
+import argparse
 from collections import defaultdict
 
 import numpy as np
@@ -76,10 +77,19 @@ def feature_frame(rows: pd.DataFrame, history: dict[str, tuple[int, int]], prior
     return result
 
 
-def choose_threshold(probabilities: np.ndarray, labels: np.ndarray) -> float:
+def choose_f1_threshold(probabilities: np.ndarray, labels: np.ndarray) -> float:
     precision, recall, thresholds = precision_recall_curve(labels, probabilities)
     f1_values = 2 * precision[:-1] * recall[:-1] / np.maximum(precision[:-1] + recall[:-1], 1e-12)
     return float(thresholds[int(np.argmax(f1_values))])
+
+
+def choose_recall_threshold(
+    probabilities: np.ndarray, labels: np.ndarray, target_recall: float
+) -> float:
+    """Choose the highest validation threshold meeting the recall target."""
+    _, recall, thresholds = precision_recall_curve(labels, probabilities)
+    candidates = thresholds[recall[:-1] >= target_recall]
+    return float(candidates.max()) if candidates.size else 0.0
 
 
 def print_metrics(title: str, labels: np.ndarray, probabilities: np.ndarray, threshold: float) -> dict[str, float]:
@@ -102,6 +112,16 @@ def print_metrics(title: str, labels: np.ndarray, probabilities: np.ndarray, thr
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--target-recall",
+        type=float,
+        default=None,
+        help="Select the highest validation threshold meeting this recall target (0 to 1).",
+    )
+    args = parser.parse_args()
+    if args.target_recall is not None and not 0 < args.target_recall <= 1:
+        raise ValueError("--target-recall must be in the interval (0, 1]")
     print("RingWatch — Stratified Supervised Risk Model")
     print("Protocol: deterministic 60/20/20 stratified transaction split (seed 42)")
     print("Warning: this is not a temporal deployment evaluation.\n")
@@ -141,8 +161,17 @@ def main() -> None:
         random_state=RANDOM_STATE,
     )
     model.fit(x_fit, fit.is_laundering_label.astype(int), sample_weight=np.where(fit.is_laundering_label, positive_weight, 1.0))
-    threshold = choose_threshold(model.predict_proba(x_validation)[:, 1], validation.is_laundering_label.astype(int).to_numpy())
-    print(f"Selected threshold on validation: {threshold:.6f}")
+    validation_probabilities = model.predict_proba(x_validation)[:, 1]
+    validation_labels = validation.is_laundering_label.astype(int).to_numpy()
+    if args.target_recall is None:
+        threshold = choose_f1_threshold(validation_probabilities, validation_labels)
+        operating_point = "maximum validation F1"
+    else:
+        threshold = choose_recall_threshold(
+            validation_probabilities, validation_labels, args.target_recall
+        )
+        operating_point = f"validation recall target {args.target_recall:.0%}"
+    print(f"Selected threshold on {operating_point}: {threshold:.6f}")
 
     # Refit with all development labels; test history contains no test labels.
     development_history, development_prior = account_history(development)

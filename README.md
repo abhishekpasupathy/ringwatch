@@ -1,298 +1,192 @@
-# RingWatch — Abuse-Ring Sentinel 🛡️
+# RingWatch
 
-> **Razorpay Buildathon | Track 02: AI Risk Manager**  
-> *"Stop the merchant losing money to fraud, returns and chargebacks"*
+**An explainable transaction-risk workbench for finding coordinated account activity and investigating potentially exposed counterparties.**
 
-[![Next.js 14](https://img.shields.io/badge/Next.js-14_App_Router-black?logo=next.js)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![PostgreSQL](https://img.shields.io/badge/Neon-Postgres-00e599?logo=postgresql)](https://neon.tech/)
-[![Groq](https://img.shields.io/badge/Groq-Llama_3_8B-orange)](https://groq.com/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+RingWatch combines two complementary views of risk:
 
----
+- A **graph baseline** maps transaction communities and highlights exposure paths between accounts.
+- A **supervised transaction model** ranks individual payments using amount, timing, payment format, and prior account-history signals.
 
-## 🚨 The Problem: The Hidden Fraud-Ring Blindspot
+The dashboard makes the graph navigable, provides live account lookups, and uses an LLM only to explain a detector decision already made by code.
 
-Fraud rings do not attack a single merchant with thousands of transactions—that triggers instant single-merchant velocity rules. Instead, sophisticated syndicates **spray micro-transactions across hundreds of unrelated, legitimate merchants**.
+[![Next.js 14](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-336791?logo=postgresql)](https://neon.tech/)
+[![Python](https://img.shields.io/badge/Python-scikit--learn-3776AB?logo=python)](https://scikit-learn.org/)
+
+## Why it exists
+
+A single merchant may see only one ordinary-looking payment. The risk emerges when many accounts coordinate activity across a network, often before delayed feedback such as a dispute or chargeback arrives. RingWatch is designed to make those relationships inspectable and to separate a reversible review hold from an irreversible downstream loss.
+
+## End-to-end flow
+
+```mermaid
+flowchart LR
+    Source["Transaction data"] --> Ingest["Ingest and normalize"]
+    Ingest --> Store[("Postgres")]
+    Store --> Graph["Graph baseline: Graphology and Louvain"]
+    Graph --> Clusters["Communities and exposure paths"]
+    Store --> Model["Supervised risk model: ExtraTrees"]
+    Model --> Scores["Transaction risk scores"]
+    Clusters --> API["Next.js API"]
+    Scores --> API
+    API --> Dashboard["Investigation dashboard"]
+    Dashboard --> Lookup["Account lookup and graph focus"]
+    Dashboard --> Explain["Bounded LLM explanation"]
+```
+
+### What happens during an investigation
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    participant Ring as 🦹‍♂️ Fraud Ring
-    participant MerchantA as 🏪 Merchant A
-    participant MerchantB as 🏪 Merchant B
-    participant Bank as 🏦 Issuing Bank
-    participant Victim as 👤 Real Cardholder
+    participant Analyst
+    participant UI as RingWatch dashboard
+    participant API as Next.js API
+    participant DB as Postgres
+    participant LLM as Groq
 
-    Ring->>MerchantA: 1 Micro-transaction (Stolen Card)
-    Note over MerchantA: Looks legitimate (Low volume)<br/>Fulfills & ships goods!
-    Ring->>MerchantB: 1 Micro-transaction (Stolen Card)
-    Note over MerchantB: Looks legitimate (Low volume)<br/>Fulfills & ships goods!
-    
-    Note over Victim,Bank: 14–30 Days Later...
-    Victim->>Bank: Disputes Unauthorized Charge
-    Bank->>MerchantA: 💥 Chargeback issued (Loss of product + ₹1500 fee)
-    Bank->>MerchantB: 💥 Chargeback issued (Loss of product + ₹1500 fee)
+    Analyst->>UI: Select an account or a live demo chip
+    UI->>API: Request account and cluster context
+    API->>DB: Read latest persisted detection run
+    DB-->>API: Structural evidence only
+    API-->>UI: Status, cluster context, and graph focus
+    UI->>API: Request explanation for a flagged cluster
+    API->>LLM: Qualitative structural evidence only
+    LLM-->>API: Plain-language explanation
+    API-->>UI: Explanation; decision remains unchanged
 ```
 
-### Why Traditional Systems Fail:
-1. **Isolated Merchant Silos**: Merchant A sees 1 normal transaction. Merchant B sees 1 normal transaction. Neither sees the cross-merchant network.
-2. **Delayed Feedback Loop**: Chargebacks land 14 to 60 days *after* goods have already been shipped.
-3. **Double Financial Loss**: The innocent merchant loses the transaction funds, the physical product, and absorbs a chargeback dispute processing fee.
+## Product capabilities
 
----
+- **Network investigation:** Louvain community detection over a weighted transaction graph, with exposed-counterparty markers.
+- **Supervised risk benchmark:** ExtraTrees classifier using payment, time, payment-format, and smoothed account-history features.
+- **Account lookup:** `SAFE`, `EXPOSED_MERCHANT`, `RING_MEMBER`, or `NOT_FOUND` responses with graph focus when available.
+- **Live demo chips:** the UI fetches valid current account IDs; unavailable categories are hidden instead of showing fake placeholder IDs.
+- **Explainability boundary:** the LLM receives qualitative graph evidence, not account IDs, raw amounts, scores, or thresholds.
+- **Operational resilience:** database operations in ingestion retry transient Prisma connection failures; large evaluation writes are batched.
 
-## 💡 The Solution: RingWatch Sentinel
+## Evaluation
 
-**RingWatch** acts as a cross-merchant defense radar. It constructs a weighted transaction graph in real time, runs deterministic community detection to isolate tightly connected clusters, and identifies legitimate merchants interacting with these rings **BEFORE** chargebacks land.
+The data currently loaded in the benchmark has 500,000 transactions and 193 positive laundering labels. The project reports two distinct operating points; they answer different questions and must not be conflated.
 
-```mermaid
-timeline
-    title Chargeback Prevention Timeline
-    Day 1 : Fraud Ring sprays transactions across Merchants A, B, C
-          : RingWatch constructs global transaction graph
-          : Louvain community detection flags structural anomaly
-    Day 2 : RingWatch issues proactive warning & settlement hold
-          : Merchant pauses shipping on flagged orders
-    Day 30 : Real cardholder files dispute with issuing bank
-          : Traditional Merchants: Lost goods + Chargeback Fee
-          : RingWatch Protected Merchants: 0 Loss (Order stopped on Day 2)
-```
+| Operating point | Precision | Recall | F1 | Use case |
+|---|---:|---:|---:|---|
+| Balanced default | **65.00%** | **66.67%** | **65.82%** | Prioritized review queue |
+| Recall-first | 0.04% | **100.00%** | 0.08% | Catch-all manual review queue |
 
----
+The balanced score is a deterministic **stratified 60/20/20** transaction benchmark (seed 42), with the threshold selected on validation only. The recall-first command selects the highest validation threshold meeting 100% recall; on this sparse dataset that threshold is zero, so every transaction is sent to review. It guarantees recall but is not an economical production setting.
 
-## 🏗️ End-to-End System Architecture
+The full protocol, confusion matrices, and limitations are in [BENCHMARK.md](BENCHMARK.md). The original forward-in-time Louvain graph baseline is retained for network investigation but currently scores 0.0% F1 on this dataset; it is not represented as the supervised model's result.
 
-RingWatch separates deterministic network detection from generative AI explanation to ensure **100% auditability and defense-only security**.
+## Architecture decisions
 
 ```mermaid
 flowchart TD
-    subgraph Data Layer ["1. Dataset & Ingestion"]
-        IBM[IBM AML HI-Small Dataset<br/>5M+ Transactions] -->|01-ingest.ts| PG[(Neon Postgres DB)]
-        PG -->|02-split.ts| Train[TRAIN Split<br/>Earliest 80% Timestamp]
-        PG -->|02-split.ts| Test[Held-Out TEST Split<br/>Latest 20% Timestamp]
-    end
-
-    subgraph Core Engine ["2. Deterministic Graph & Detection Engine"]
-        Train -->|03-detect-train.ts| GB[Graph Builder<br/>Graphology]
-        GB -->|Node/Edge Sorting| Louvain[Louvain Community Detection<br/>5x Max Modularity Selection]
-        Louvain --> Scoring[4-Metric Suspicion Scoring<br/>Density + Bursts + Formats + Illicit Ratio]
-        Scoring --> Sweep[Threshold Sweep on TRAIN<br/>Maximize F1 Score]
-        Sweep -->|Persist Threshold| DBRun[(Detection Runs & Clusters)]
-    end
-
-    subgraph Evaluation ["3. Stage 3 Evaluation Module"]
-        Test -->|04-evaluate.ts| TestEval[Evaluate on TEST Set Only]
-        DBRun -.->|Read Train Threshold| TestEval
-        TestEval --> Report[eval-report.md<br/>Precision / Recall / FP Cost]
-    end
-
-    subgraph UI Layer ["4. Next.js 14 Dashboard & LLM Boundary"]
-        DBRun -->|Precomputed API| API[/api/graph & /api/metrics/]
-        API --> Dashboard[Next.js 14 Dashboard<br/>react-force-graph-2d]
-        
-        Dashboard -->|Click Cluster| ExplainAPI[/api/explain]
-        ExplainAPI -->|Runtime Validator<br/>No Raw Thresholds/Scores| Groq[Groq API<br/>Llama-3 8B]
-        Groq -->|2-3 Sentences| Summary[Plain-English Explanation]
-    end
-
-    style Data Layer fill:#0f172a,stroke:#334155,color:#fff
-    style Core Engine fill:#022c22,stroke:#059669,color:#fff
-    style Evaluation fill:#1e1b4b,stroke:#4338ca,color:#fff
-    style UI Layer fill:#111827,stroke:#374151,color:#fff
+    Decision["Detector decision"] --> Rule["Threshold and policy check"]
+    Rule --> Status["Persisted account or cluster status"]
+    Status --> Boundary{"Explanation boundary"}
+    Boundary -->|"Qualitative metrics only"| Prompt["LLM prompt"]
+    Boundary -->|"Raw IDs, amounts, scores, thresholds"| Block["Blocked"]
+    Prompt --> Summary["Plain-language summary"]
+    Summary --> Analyst["Human review"]
 ```
 
----
+The detector remains auditable because the explanation layer cannot change a score, a threshold, or an account status. The dashboard deliberately exposes qualitative tiers and structural evidence rather than a recipe for evasion.
 
-## 🛡️ Strict LLM Boundary & Defense-Only Design
-
-A core constraint of the Razorpay Risk Manager brief is **Defense-Only Security** (no exposing internal thresholds that allow fraudsters to game the system) and **AI Appropriateness** (using AI where it excels, not for decision making).
-
-```mermaid
-gantt
-    title Decision vs Explanation Boundary
-    dateFormat X
-    axisFormat %s
-
-    section Deterministic Core
-    Graph Construction & Louvain      :active, d1, 0, 3
-    Suspicion Metric Scoring          :active, d2, 3, 5
-    Flagging Threshold Comparison     :crit, active, d3, 5, 6
-
-    section LLM Explanation Layer
-    Runtime Boundary Assertion        :milestone, m1, 6, 6
-    Groq Natural Language Summary     :done, l1, 6, 9
-```
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                      DETERMINISTIC GRAPH CORE                          │
-│                                                                        │
-│  • Graphology Louvain Community Detection                              │
-│  • 4 Structural Metrics (Internal Density, Time Bursts, Formats)       │
-│  • Fully Auditable & Reproducible (No Hallucinations)                  │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                                    ▼ (Decision Already Made)
-┌────────────────────────────────────────────────────────────────────────┐
-│                     STRICT LLM BOUNDARY VALIDATOR                      │
-│                                                                        │
-│  ✓ Passes: Qualitative Density ("HIGH"), Time Burst ("DETECTED")       │
-│  ❌ Blocks: Raw Suspicion Score (0.84), Internal Threshold (0.55)      │
-│  ❌ Blocks: Account IDs, Raw Monetary Amounts                          │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                        GROQ LLM EXPLANATION                            │
-│                                                                        │
-│  "This cluster exhibits tight internal transaction density with       │
-│   synchronized payment bursts across multiple formats, indicative of   │
-│   a coordinated fraud ring."                                          │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 📊 Measured Performance
-
-### Supervised transaction-risk benchmark
-
-The current best reproducible benchmark is a scikit-learn histogram gradient-
-boosting classifier evaluated on a deterministic **stratified 60/20/20**
-transaction split (random seed 42). The threshold is chosen on validation only;
-the final test partition is not used for training, feature history, or threshold
-selection.
-
-| Metric | Held-out value |
-| :--- | ---: |
-| **Precision** | **65.00%** |
-| **Recall** | **66.67%** |
-| **F1 Score** | **65.82%** |
-| True positives / false positives | 26 / 14 |
-| False negatives / true negatives | 13 / 99,947 |
-
-This benchmark uses 500,000 transactions with 193 labelled positive examples.
-It measures supervised pattern recognition when labelled history is available;
-it is **not** a forward-in-time deployment metric. The complete protocol and
-confusion matrix are in [BENCHMARK.md](BENCHMARK.md).
-
-### Temporal graph-detector baseline
-
-The original Louvain detector uses the earliest 80% of transactions for training
-and the latest 20% for testing. On the currently loaded data it scored 0.0% F1
-(0 TP, 12 FP, 167 FN, and 83,256 TN). This result is retained as an honest
-baseline, not presented as a production-quality model.
-
-### Live demo accounts
-
-The dashboard now loads valid account IDs from the latest TEST detection run
-for each available category (ring member, exposed merchant, and safe account).
-This replaces stale hard-coded placeholders in the account lookup bar, so the
-demo chips work on both seeded and pipeline-populated databases. A category is
-hidden when the latest run has no matching account.
-
----
-
-## 🌐 Deployment Status & Vercel Guide
-
-### Is it deployed on Vercel?
-**Yes!** RingWatch is built with Next.js 14 App Router and optimized for Vercel deployment backed by a Neon serverless Postgres database.
-
-### How to Deploy to Vercel in 3 Steps:
-
-1. **Push to GitHub**:
-   ```bash
-   git push origin main
-   ```
-
-2. **Import into Vercel**:
-   - Go to [Vercel Dashboard](https://vercel.com/new) $\rightarrow$ Import `ringwatch` repository.
-   - Set Framework Preset to **Next.js**.
-
-3. **Configure Environment Variables**:
-   Add the following in the Vercel Project Settings $\rightarrow$ Environment Variables:
-
-   | Variable Name | Value | Description |
-   | :--- | :--- | :--- |
-   | `DATABASE_URL` | `postgresql://...` | Neon Postgres Connection String |
-   | `GROQ_API_KEY` | `gsk_...` | Groq API Key for LLM Explanations |
-
-4. **Deploy**:
-   Click **Deploy**. The API routes are configured with `export const dynamic = "force-dynamic"` and custom `vercel.json` execution timeouts for graph queries.
-
----
-
-## 🚀 Quickstart & Reproduction Guide
+## Quickstart
 
 ### Prerequisites
-- Node.js 20+
-- Python 3.11+ (for the supervised benchmark)
-- A free [Neon Postgres](https://neon.tech) database
-- A free [Groq API](https://console.groq.com) key
 
-### 1. Installation & Environment
+- Node.js 20+
+- Python 3.11+
+- PostgreSQL or Neon connection string
+- Groq API key (optional; deterministic fallback explanations work without it)
+
+### Install and configure
+
 ```bash
 git clone https://github.com/abhishekpasupathy/ringwatch.git
 cd ringwatch
 npm install
+python3 -m pip install -r requirements.txt
 
 cp .env.local.example .env.local
-# Edit .env.local with your DATABASE_URL and GROQ_API_KEY
+# Add DATABASE_URL and, optionally, GROQ_API_KEY.
 ```
 
-### 2. Database Initialization
+### Initialize the database
+
 ```bash
 npm run db:push
 npm run db:generate
 ```
 
-### 3. Run Pipeline (Dataset Ingestion $\rightarrow$ Split $\rightarrow$ Train $\rightarrow$ Eval)
+### Load data and build the graph baseline
+
 ```bash
-# Downloads IBM AML HI-Small dataset (~5M rows), ingests, splits, tunes, and evaluates:
+# Downloads or reads the IBM AML HI-Small CSV, then runs the temporal pipeline.
 npm run pipeline
 ```
 
-### 4. Run the supervised benchmark
+For a smaller development run, set `RINGWATCH_MAX_ROWS` before ingestion.
+
+### Run the supervised benchmarks
 
 ```bash
-python3 -m pip install -r requirements.txt
+# Balanced F1 operating point.
 npm run ml:stratified
+
+# Recall-first operating point; on the current data, this reaches 100% recall.
+npm run ml:recall-first
 ```
 
-This prints the stratified held-out precision, recall, and F1 documented above.
+### Start the dashboard
 
-### 5. Launch Dashboard
 ```bash
 npm run dev
-# Open http://localhost:3000
+# http://localhost:3000
 ```
 
----
+An empty database is seeded with representative graph data on first dashboard request, allowing the UI to be explored before a full ingestion.
 
-## 🎯 What to Highlight in Your Hackathon Pitch
+## API surface
 
-When presenting RingWatch to the Razorpay judges, focus on these 4 core pillars:
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/graph` | Precomputed graph nodes, links, and cluster metadata |
+| `GET /api/metrics` | Latest persisted temporal graph-evaluation metrics |
+| `GET /api/lookup?account_id=...` | Account investigation result and evidence |
+| `POST /api/explain` | Bounded explanation for a flagged cluster |
+| `GET /api/demo-accounts` | Live account IDs for available demo categories |
 
-1. **The Merchant Protection Story**:
-   > *"We don't just find laundering rings—we map licit accounts transacting with those rings as 'Exposed Merchants'. We protect the merchant who would otherwise ship goods today and eat a chargeback 30 days later."*
+## Repository map
 
-2. **Right Tool for the Job (AI Boundary)**:
-   > *"We explicitly chose NOT to use AI for the fraud decision. Graph neural networks and LLMs are non-deterministic black boxes. Detection is 100% deterministic Louvain graph math. AI is used solely for plain-English merchant explanations."*
+```text
+app/                 Next.js pages and API routes
+components/          Dashboard, graph, lookup, and inspector UI
+lib/                 Graph, detector, database, and LLM-boundary modules
+prisma/              Postgres schema
+scripts/             Ingestion, graph evaluation, and ML benchmarks
+BENCHMARK.md         Reproducible benchmark protocol and outcomes
+```
 
-3. **Honest False-Positive Quantification**:
-   > *"We don't hand-wave false positives. On our held-out test set, we explicitly calculated the settlement-delay cost of our false-positive rate and proved why optimizing for recall saves merchants more money than it costs in temporary holds."*
+## Development checks
 
-4. **Honest Failure Storytelling (Judge Scoring Favorite)**:
-   > *"Louvain community detection is heuristic with no deterministic random seed in JS. We mitigated this by sorting nodes/edges and running 5-pass max-modularity selection, achieving $\pm1\text{--}2\%$ stability. In production, we would deploy a consensus ensemble."*
+```bash
+npm run build
+npm run lint
+npm run test:detector
+npm run test:ml
+npm run test:gb
+npm run test:graph-features
+```
 
----
+## Limits and next steps
 
-## 🛠️ Stack & Technologies
+- The available labels are extremely sparse, so metrics should be interpreted with confidence intervals before any production decision.
+- The supervised benchmark is stratified, not a simulation of future-only deployment. A stronger production evaluation needs more historical labels and a rolling temporal-validation design.
+- The graph baseline and supervised score are complementary today; a production system should persist calibrated supervised scores and combine them with graph evidence behind a human review workflow.
 
-* **Framework**: Next.js 14 (App Router) + TypeScript
-* **Database**: Neon (Serverless Postgres) + Prisma ORM v5
-* **Graph Engine**: `graphology` + `graphology-communities-louvain`
-* **Visualization**: `react-force-graph-2d` (SSR-disabled dynamic import)
-* **LLM Engine**: Groq API (`llama3-8b-8192`)
-* **Styling**: Vanilla CSS + Tailwind CSS (Dark Fintech Aesthetics)
+## Technology
+
+Next.js 14, TypeScript, Prisma, Neon/Postgres, Graphology, Louvain community detection, scikit-learn, react-force-graph-2d, and Groq.
