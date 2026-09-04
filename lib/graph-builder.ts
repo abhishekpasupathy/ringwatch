@@ -41,6 +41,9 @@ export function buildGraph(
 
   for (const tx of transactions) {
     const { fromAccountId: from, toAccountId: to } = tx;
+    // A transfer to the same account cannot establish a ring relationship and
+    // otherwise makes the undirected density exceed 1.0 for small clusters.
+    if (from === to) continue;
     nodeSet.add(from);
     nodeSet.add(to);
 
@@ -96,6 +99,9 @@ export function buildGraph(
       hasBurst,
       paymentFormats: Array.from(edge.paymentFormats).sort(),
       paymentFormatCount: edge.paymentFormats.size,
+      // Keep the actual set on the edge so community scoring can calculate
+      // diversity across the whole community (not just a per-edge count).
+      paymentFormats: Array.from(edge.paymentFormats),
     });
   }
 

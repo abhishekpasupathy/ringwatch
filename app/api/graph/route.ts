@@ -25,6 +25,7 @@ import prisma from "@/lib/db";
 import { toDensityLabel } from "@/lib/llm-boundary";
 
 import { ensureDataSeeded } from "@/lib/auto-seed";
+import { demoGraph } from "@/lib/demo-data";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ const MAX_NODES = 500;
 export async function GET() {
   try {
     if (!process.env.DATABASE_URL) {
-      return NextResponse.json({ error: "DATABASE_URL not configured" }, { status: 500 });
+      return NextResponse.json(demoGraph);
     }
 
     // Get most recent TEST detection run

@@ -19,8 +19,17 @@ const prisma = new PrismaClient();
 const DATA_DIR = path.join(process.cwd(), "data");
 const CSV_FILENAME = "HI-Small_Trans.csv";
 const CSV_PATH = path.join(DATA_DIR, CSV_FILENAME);
+<<<<<<< HEAD
 const BATCH_SIZE = 2_000;
 const CONCURRENCY = 3;
+=======
+
+const BATCH_SIZE = 5_000; // 10 columns × 5k stays under PostgreSQL's 65,535 parameter limit
+// Set SAMPLE_LICIT_ROWS to keep every labeled laundering transaction while
+// deterministically sampling normal traffic for a fast, reproducible demo run.
+// Leave unset (or set to 0) to ingest the complete source file.
+const SAMPLE_LICIT_ROWS = Number.parseInt(process.env.SAMPLE_LICIT_ROWS ?? "0", 10);
+>>>>>>> 2018447 (Add ML-based detector and account graph features)
 
 interface RawRow {
   timestamp: string;
@@ -73,8 +82,18 @@ async function downloadIfMissing() {
 
 async function parseCSV(maxRows?: number): Promise<RawRow[]> {
   const rows: RawRow[] = [];
+<<<<<<< HEAD
   const stream = fs.createReadStream(CSV_PATH);
   let buffer = "";
+=======
+  const sampledLicitRows: RawRow[] = [];
+  let seenLicit = 0;
+  const rl = readline.createInterface({
+    input: fs.createReadStream(CSV_PATH),
+    crlfDelay: Infinity,
+  });
+
+>>>>>>> 2018447 (Add ML-based detector and account graph features)
   let lineNum = 0;
 
   for await (const chunk of stream) {
@@ -82,6 +101,7 @@ async function parseCSV(maxRows?: number): Promise<RawRow[]> {
     const lines = buffer.split(/\r?\n/);
     buffer = lines.pop() ?? "";
 
+<<<<<<< HEAD
     for (const line of lines) {
       lineNum++;
       if (lineNum === 1) continue;
@@ -90,6 +110,36 @@ async function parseCSV(maxRows?: number): Promise<RawRow[]> {
         console.log(`\n✓ Limited run: using first ${rows.length.toLocaleString()} transaction rows`);
         return rows;
       }
+=======
+    const row: RawRow = {
+      timestamp: parts[0].trim(),
+      fromBank: parseInt(parts[1].trim(), 10),
+      fromAccount: parts[2].trim(),
+      toBank: parseInt(parts[3].trim(), 10),
+      toAccount: parts[4].trim(),
+      amountReceived: parseFloat(parts[5].trim()),
+      receivingCurrency: parts[6].trim(),
+      amountPaid: parseFloat(parts[7].trim()),
+      paymentCurrency: parts[8].trim(),
+      paymentFormat: parts[9].trim(),
+      isLaundering: parseInt(parts[10].trim(), 10),
+    };
+
+    if (row.isLaundering === 1 || SAMPLE_LICIT_ROWS <= 0) {
+      rows.push(row);
+    } else {
+      // Reservoir sampling with a deterministic pseudo-random value derived
+      // from the source row number. This makes the reduced dataset reproducible.
+      seenLicit++;
+      if (sampledLicitRows.length < SAMPLE_LICIT_ROWS) {
+        sampledLicitRows.push(row);
+      } else {
+        const pseudoRandom = ((lineNum * 1_103_515_245 + 12_345) >>> 0) / 2 ** 32;
+        const slot = Math.floor(pseudoRandom * seenLicit);
+        if (slot < SAMPLE_LICIT_ROWS) sampledLicitRows[slot] = row;
+      }
+    }
+>>>>>>> 2018447 (Add ML-based detector and account graph features)
 
       const parts = line.split(",");
       if (parts.length < 11) continue;
@@ -113,8 +163,20 @@ async function parseCSV(maxRows?: number): Promise<RawRow[]> {
       }
     }
   }
+<<<<<<< HEAD
 
   console.log(`\n✓ Parsed ${rows.length.toLocaleString()} transaction rows`);
+=======
+  if (SAMPLE_LICIT_ROWS > 0) {
+    rows.push(...sampledLicitRows);
+    console.log(
+      `\n✓ Parsed ${rows.length.toLocaleString()} rows: all labeled laundering transactions + ` +
+        `${sampledLicitRows.length.toLocaleString()} deterministically sampled licit transactions`
+    );
+  } else {
+    console.log(`\n✓ Parsed ${rows.length.toLocaleString()} transaction rows`);
+  }
+>>>>>>> 2018447 (Add ML-based detector and account graph features)
   return rows;
 }
 

@@ -24,6 +24,7 @@ export default function DashboardClient() {
   const [graphLoading, setGraphLoading] = useState(true);
   const graphRef = useRef<ForceGraphHandle>(null);
 
+<<<<<<< HEAD
   useEffect(() => {
     async function loadDashboard() {
       try {
@@ -49,6 +50,35 @@ export default function DashboardClient() {
     }
 
     void loadDashboard();
+=======
+  async function loadDashboard() {
+    setGraphLoading(true);
+    setMetricsLoading(true);
+    setGraphError(null);
+    fetch("/api/graph")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) {
+          setGraphError(data.error);
+        } else {
+          setGraphData(data);
+        }
+      })
+      .catch(() => setGraphError("Failed to load graph data"))
+      .finally(() => setGraphLoading(false));
+
+    fetch("/api/metrics")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.error) setMetrics(data);
+      })
+      .catch(() => {})
+      .finally(() => setMetricsLoading(false));
+  }
+
+  useEffect(() => {
+    loadDashboard();
+>>>>>>> 2018447 (Add ML-based detector and account graph features)
   }, []);
 
   const handleAccountFocus = useCallback((accountId: string) => {
@@ -93,9 +123,90 @@ export default function DashboardClient() {
         </div>
       </header>
 
+<<<<<<< HEAD
       <div className="flex-shrink-0 px-5 lg:px-7 py-2 border-b border-white/[.06] bg-[#080b11] flex items-center gap-3">
         <div className="section-label hidden sm:flex items-center gap-2 whitespace-nowrap"><Search size={12} /> ACCOUNT SEARCH</div>
         <div className="flex-1"><AccountLookupBar onAccountFocus={handleAccountFocus} /></div>
+=======
+      {/* ── Live Account Lookup Bar ────────────────────────────────────────── */}
+      <AccountLookupBar />
+
+      {/* ── Main Dashboard Workspace ───────────────────────────────────────── */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Force Graph Visualization */}
+        <div className="flex-1 relative bg-[#07090e]">
+          {graphLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-[#07090e] z-20">
+              <div className="text-center">
+                <div className="w-10 h-10 border-2 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto mb-3 glow-teal-sm" />
+                <p className="text-slate-400 text-xs font-mono tracking-wider">LOADING GRAPH ENGINE…</p>
+              </div>
+            </div>
+          )}
+
+          {graphError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-[#07090e] z-20">
+              <div className="text-center max-w-sm glass-panel p-6 rounded-2xl border border-slate-800">
+                <AlertTriangle className="text-amber-400 mx-auto mb-3" size={32} />
+                <p className="text-slate-200 font-bold mb-1">Graph Data Unavailable</p>
+                <p className="text-slate-400 text-xs leading-relaxed">{graphError}</p>
+                <button
+                  onClick={loadDashboard}
+                  className="mt-4 rounded-lg border border-teal-400/40 bg-teal-400/10 px-3 py-2 text-xs font-semibold text-teal-300 hover:bg-teal-400/20"
+                >
+                  Retry loading
+                </button>
+              </div>
+            </div>
+          )}
+
+          {graphData && !graphLoading && (
+            <>
+              {/* Tactical Legend Overlay */}
+              <div className="absolute top-4 left-4 z-10 glass-panel border border-white/10 rounded-xl p-3 shadow-2xl space-y-2">
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                  Live Network Legend
+                </p>
+                {[
+                  { color: "bg-red-500 glow-red-sm", label: "Ring Member (Illicit)" },
+                  { color: "bg-amber-500 glow-amber-sm", label: "Exposed Merchant (Licit)" },
+                  { color: "bg-blue-500 glow-teal-sm", label: "Safe Account" },
+                ].map(({ color, label }) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <div className={`w-2.5 h-2.5 rounded-full ${color}`} />
+                    <span className="text-slate-300 text-xs font-medium">{label}</span>
+                  </div>
+                ))}
+                <p className="text-slate-400 text-[10px] pt-1 border-t border-white/5 italic">
+                  Hover node to highlight edges
+                </p>
+              </div>
+
+              <ForceGraphWrapper
+                nodes={graphData.nodes}
+                links={graphData.links}
+                onNodeClick={handleNodeClick}
+                selectedClusterId={selectedCluster?.id}
+              />
+            </>
+          )}
+        </div>
+
+        {/* Right: Metrics Panel */}
+        <div className="w-80 border-l border-white/10 bg-[#090d16]/95 flex-shrink-0 overflow-hidden">
+          <MetricsPanel metrics={metrics} loading={metricsLoading} />
+        </div>
+
+        {/* Cluster Detail Panel (slides in on node click) */}
+        {selectedCluster && (
+          <div className="w-80 flex-shrink-0 border-l border-white/10 z-20">
+            <ClusterPanel
+              cluster={selectedCluster}
+              onClose={() => setSelectedCluster(null)}
+            />
+          </div>
+        )}
+>>>>>>> 2018447 (Add ML-based detector and account graph features)
       </div>
 
       <main className="flex-1 min-h-0 p-3 lg:p-4 flex gap-3 overflow-hidden">

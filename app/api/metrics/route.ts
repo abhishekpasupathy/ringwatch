@@ -11,7 +11,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { ensureDataSeeded } from "@/lib/auto-seed";
+<<<<<<< HEAD
 import { SUPERVISED_BENCHMARK } from "@/lib/supervised-benchmark";
+=======
+import { demoMetrics } from "@/lib/demo-data";
+>>>>>>> 2018447 (Add ML-based detector and account graph features)
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -20,6 +24,7 @@ const NO_STORE_HEADERS = { "Cache-Control": "no-store, max-age=0" };
 
 export async function GET(req: NextRequest) {
   try {
+<<<<<<< HEAD
     // The dashboard defaults to the stronger supervised benchmark. The graph
     // baseline remains available explicitly for diagnostic comparison.
     if (new URL(req.url).searchParams.get("source") !== "temporal") {
@@ -30,6 +35,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "DATABASE_URL not configured" }, { status: 500, headers: NO_STORE_HEADERS });
     }
 
+=======
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json(demoMetrics);
+    }
+
+>>>>>>> 2018447 (Add ML-based detector and account graph features)
     let m = await prisma.evalMetrics.findFirst({
       where: { split: "TEST" },
       orderBy: { runAt: "desc" },

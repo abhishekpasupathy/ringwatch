@@ -150,7 +150,59 @@ gantt
 
 The detector remains auditable because the explanation layer cannot change a score, a threshold, or an account status. The dashboard deliberately exposes qualitative tiers and structural evidence rather than a recipe for evasion.
 
+<<<<<<< HEAD
 ## Quickstart
+=======
+---
+
+## 📊 Measured Performance on Held-Out Test Set
+
+The model was tuned **ONLY on the TRAIN split** (earliest 80% by timestamp) and evaluated **ONLY on the held-out TEST split** (latest 20%).
+
+| Metric | Measured Value | Rationale & Trade-Off |
+| :--- | :--- | :--- |
+| **Precision** | **Measured on TEST** | High precision minimizes unnecessary merchant friction. |
+| **Recall** | **Tuned for High Recall** | Prioritized over precision because an undetected ring chargeback is an unrecoverable financial loss (goods shipped + fee), whereas a false positive is a temporary 2-day hold. |
+| **F1 Score** | **Optimal Threshold** | Selected at max F1 during offline train threshold sweep. |
+| **False-Positive Cost** | **Quantified in INR/USD** | Calculated directly from test FP count: `FP_Count × Avg_Daily_Vol × 2-Day Hold`. |
+
+---
+
+## 🌐 Deployment Status & Vercel Guide
+
+### Deployment readiness
+RingWatch is built for Vercel and requires `DATABASE_URL` to persist its data.
+Without it, `npm run dev` presents a small interactive local demo so the UI can
+be checked immediately. On a configured but empty database, the dashboard
+creates a small demo dataset on first load. Use the pipeline below for actual
+IBM AML evaluation; demo metrics are not a production or benchmark claim.
+
+### How to Deploy to Vercel in 3 Steps:
+
+1. **Push to GitHub**:
+   ```bash
+   git push origin main
+   ```
+
+2. **Import into Vercel**:
+   - Go to [Vercel Dashboard](https://vercel.com/new) $\rightarrow$ Import `ringwatch` repository.
+   - Set Framework Preset to **Next.js**.
+
+3. **Configure Environment Variables**:
+   Add the following in the Vercel Project Settings $\rightarrow$ Environment Variables:
+
+   | Variable Name | Value | Description |
+   | :--- | :--- | :--- |
+   | `DATABASE_URL` | `postgresql://...` | Neon Postgres Connection String |
+   | `GROQ_API_KEY` | `gsk_...` | Groq API Key for LLM Explanations |
+
+4. **Deploy**:
+   Click **Deploy**. The API routes are configured with `export const dynamic = "force-dynamic"` and custom `vercel.json` execution timeouts for graph queries.
+
+---
+
+## 🚀 Quickstart & Reproduction Guide
+>>>>>>> 2018447 (Add ML-based detector and account graph features)
 
 ### Prerequisites
 
@@ -181,6 +233,7 @@ npm run db:generate
 ### Load data and build the graph baseline
 
 ```bash
+<<<<<<< HEAD
 # Downloads or reads the IBM AML HI-Small CSV, then runs the temporal pipeline.
 npm run pipeline
 ```
@@ -189,6 +242,21 @@ For a smaller development run, set `RINGWATCH_MAX_ROWS` before ingestion.
 
 ### Run the supervised benchmarks
 
+=======
+# Ingests a local HI-Small_Trans.csv dataset, splits, tunes, and evaluates:
+npm run pipeline
+```
+
+For a faster reproducible run on a smaller Neon database, retain every
+labeled laundering transaction and sample legitimate traffic:
+
+```bash
+SAMPLE_LICIT_ROWS=100000 npm run ingest
+npm run split && npm run detect && npm run evaluate
+```
+
+### 4. Launch Dashboard
+>>>>>>> 2018447 (Add ML-based detector and account graph features)
 ```bash
 # Balanced F1 operating point.
 npm run ml:stratified
@@ -197,7 +265,25 @@ npm run ml:stratified
 npm run ml:recall-first
 ```
 
+<<<<<<< HEAD
 ### Start the dashboard
+=======
+### Verification checklist
+
+```bash
+npm install
+npm run build
+```
+
+With a configured `DATABASE_URL`, open the dashboard and use the sample
+accounts shown in the lookup chips. The graph is deliberately click-stable:
+selecting a node opens its details without recentering, zooming, or dragging
+the network. For a full evaluation, place `HI-Small_Trans.csv` under `data/`,
+run `npm run pipeline`, and inspect the generated `eval-report.md`. Do not
+claim an 80% score until the held-out TEST F1 in that report reaches it.
+
+---
+>>>>>>> 2018447 (Add ML-based detector and account graph features)
 
 ```bash
 npm run dev

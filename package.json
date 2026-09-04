@@ -9,10 +9,12 @@
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "labels:refresh": "tsx scripts/00-refresh-labels.ts",
     "ingest": "tsx scripts/01-ingest.ts",
     "split": "tsx scripts/02-split.ts",
     "detect": "tsx scripts/03-detect-train.ts",
     "evaluate": "tsx scripts/04-evaluate.ts",
+<<<<<<< HEAD
     "ml": "tsx scripts/05-ml-train-evaluate.ts",
     "ml:gb": "tsx scripts/06-gradient-boosting-train-evaluate.ts",
     "ml:tx": "tsx scripts/10-transaction-gb.ts",
@@ -23,6 +25,11 @@
     "test:ml": "tsx scripts/ml-regression-test.ts",
     "test:gb": "tsx scripts/gradient-boosting-regression-test.ts",
     "test:graph-features": "tsx scripts/graph-features-regression-test.ts",
+=======
+    "ml:stratified": "python3 scripts/11-stratified-risk-model.py",
+    "ml:recall-first": "python3 scripts/11-stratified-risk-model.py --target-recall 1.0",
+    "test:detector": "tsx scripts/detector-regression-test.ts",
+>>>>>>> 2018447 (Add ML-based detector and account graph features)
     "pipeline": "npm run ingest && npm run split && npm run detect && npm run evaluate"
   },
   "dependencies": {

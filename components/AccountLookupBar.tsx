@@ -4,9 +4,9 @@
  * RingWatch — Account Lookup Bar Component (Redesigned)
  *
  * Prominent tactical search input + glowing pill demo chips:
- *   🔴 101_20    — Confirmed Ring Member
- *   🟠 201_500   — Exposed Merchant
- *   🔵 300_1000  — Safe Account
+ *   🔴 102_40    — Confirmed Ring Member
+ *   🟠 202_500   — Exposed Merchant
+ *   🔵 300_1036  — Safe Account
  */
 
 import { useEffect, useState } from "react";
@@ -31,11 +31,19 @@ interface LookupResult {
   };
 }
 
+<<<<<<< HEAD
 const DEMO_CHIP_CONFIG = [
   { key: "ringMember", label: "Ring Member", color: "bg-red-500/10 text-red-400 border-red-500/40 hover:bg-red-500/20 shadow-sm shadow-red-500/10" },
   { key: "exposedMerchant", label: "Exposed Merchant", color: "bg-amber-500/10 text-amber-400 border-amber-500/40 hover:bg-amber-500/20 shadow-sm shadow-amber-500/10" },
   { key: "safeAccount", label: "Safe Account", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/20 shadow-sm shadow-emerald-500/10" },
 ] as const;
+=======
+const DEMO_CHIPS = [
+  { id: "102_40", label: "Ring Member", color: "bg-red-500/10 text-red-400 border-red-500/40 hover:bg-red-500/20 shadow-sm shadow-red-500/10" },
+  { id: "202_500", label: "Exposed Merchant", color: "bg-amber-500/10 text-amber-400 border-amber-500/40 hover:bg-amber-500/20 shadow-sm shadow-amber-500/10" },
+  { id: "300_1036", label: "Safe Account", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/20 shadow-sm shadow-emerald-500/10" },
+];
+>>>>>>> 2018447 (Add ML-based detector and account graph features)
 
 type DemoAccounts = Record<(typeof DEMO_CHIP_CONFIG)[number]["key"], string | null>;
 
@@ -98,7 +106,7 @@ export default function AccountLookupBar({ onAccountFocus }: AccountLookupBarPro
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                placeholder="Lookup account ID (e.g. 101_20, 201_500, 300_1000)..."
+                placeholder="Lookup account ID (e.g. 102_40, 202_500, 300_1036)..."
                 className="w-full bg-[#131b2e] border border-slate-700/80 rounded-xl pl-10 pr-9 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-400 font-mono transition-all"
               />
               {query && (

@@ -22,6 +22,7 @@ import {
   toSuspicionTier,
   StructuralEvidence,
 } from "@/lib/llm-boundary";
+import { getDemoLookup } from "@/lib/demo-data";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -40,12 +41,16 @@ export async function GET(req: NextRequest) {
       );
     }
 
+<<<<<<< HEAD
     if (!process.env.DATABASE_URL) {
       return NextResponse.json(
         { error: "DATABASE_URL environment variable is missing." },
         { status: 500, headers: NO_STORE_HEADERS }
       );
     }
+=======
+    if (!process.env.DATABASE_URL) return NextResponse.json(getDemoLookup(accountId));
+>>>>>>> 2018447 (Add ML-based detector and account graph features)
 
     // 1. Check if account exists in DB (indexed lookup)
     const account = await prisma.account.findUnique({

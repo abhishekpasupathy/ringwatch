@@ -17,7 +17,20 @@ import { buildGraph, percentile99 } from "./graph-builder";
 import { scoreAllCommunities, sweepThreshold } from "./detector";
 import { evaluate } from "./evaluator";
 
-export async function ensureDataSeeded(): Promise<boolean> {
+const globalForSeed = globalThis as typeof globalThis & {
+  ringWatchSeedPromise?: Promise<boolean>;
+};
+
+export function ensureDataSeeded(): Promise<boolean> {
+  // /api/graph and /api/metrics load in parallel on the dashboard. Share one
+  // seed operation so an empty database cannot receive competing inserts.
+  if (!globalForSeed.ringWatchSeedPromise) {
+    globalForSeed.ringWatchSeedPromise = seedData();
+  }
+  return globalForSeed.ringWatchSeedPromise;
+}
+
+async function seedData(): Promise<boolean> {
   try {
     const existingRun = await prisma.detectionRun.findFirst({
       where: { split: "TEST" },
