@@ -17,7 +17,6 @@
  */
 
 import dynamic from "next/dynamic";
-<<<<<<< HEAD
 import {
   useCallback,
   useRef,
@@ -28,9 +27,6 @@ import {
   useImperativeHandle,
 } from "react";
 import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
-=======
-import { useCallback, useState, useMemo } from "react";
->>>>>>> 2018447 (Add ML-based detector and account graph features)
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
   ssr: false,
@@ -76,7 +72,6 @@ interface ForceGraphWrapperProps {
   selectedNodeId?: string;
 }
 
-<<<<<<< HEAD
 const ForceGraphWrapper = forwardRef<ForceGraphHandle, ForceGraphWrapperProps>(
   function ForceGraphWrapper({ nodes, links, onNodeClick, selectedNodeId }, ref) {
     const fgRef = useRef<any>();
@@ -87,15 +82,6 @@ const ForceGraphWrapper = forwardRef<ForceGraphHandle, ForceGraphWrapperProps>(
     const [currentZoom, setCurrentZoom] = useState(1);
     const pulseTimeRef = useRef(0);
     const animFrameRef = useRef<number>();
-=======
-export default function ForceGraphWrapper({
-  nodes,
-  links,
-  onNodeClick,
-  selectedClusterId,
-}: ForceGraphWrapperProps) {
-  const [hoverNode, setHoverNode] = useState<GraphNode | null>(null);
->>>>>>> 2018447 (Add ML-based detector and account graph features)
 
     // Continuous redraw for ring-member pulse animation
     useEffect(() => {
@@ -123,19 +109,9 @@ export default function ForceGraphWrapper({
 
       neighbors.add(hoverNode.id);
 
-<<<<<<< HEAD
       for (const link of links) {
         const sId = typeof link.source === "object" ? link.source.id : link.source;
         const tId = typeof link.target === "object" ? link.target.id : link.target;
-=======
-  const handleNodeClick = useCallback(
-    (node: Record<string, unknown>) => {
-      const gNode = node as unknown as GraphNode;
-      onNodeClick(gNode);
-    },
-    [onNodeClick]
-  );
->>>>>>> 2018447 (Add ML-based detector and account graph features)
 
         if (sId === hoverNode.id) {
           neighbors.add(tId);
@@ -387,7 +363,6 @@ export default function ForceGraphWrapper({
           autoPauseRedraw={false}
         />
 
-<<<<<<< HEAD
         {/* Hover tooltip */}
         {hoverNode && mousePos && (
           <div
@@ -436,26 +411,3 @@ export default function ForceGraphWrapper({
 );
 
 export default ForceGraphWrapper;
-=======
-  return (
-    <div className="w-full h-full relative radar-grid overflow-hidden">
-      <ForceGraph2D
-        graphData={{ nodes, links }}
-        nodeId="id"
-        nodeCanvasObject={nodeCanvasObject}
-        nodeCanvasObjectMode={() => "replace"}
-        linkColor={linkColor}
-        linkWidth={linkWidth}
-        backgroundColor="#07090e"
-        onNodeClick={handleNodeClick}
-        onNodeHover={handleNodeHover}
-        warmupTicks={80}
-        cooldownTicks={0}
-        d3AlphaDecay={0.02}
-        d3VelocityDecay={0.3}
-        enableNodeDrag={false}
-      />
-    </div>
-  );
-}
->>>>>>> 2018447 (Add ML-based detector and account graph features)
