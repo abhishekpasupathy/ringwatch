@@ -23,32 +23,7 @@ html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; background: 
 h1, h2, h3, h4 { font-family: var(--font-heading); }
 .font-mono-stat { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
 
-<<<<<<< HEAD
-=======
-html,
-body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-  background-color: var(--color-bg);
-  color: #e2e8f0;
-  font-family: var(--font-body);
-  -webkit-font-smoothing: antialiased;
-}
-
-h1, h2, h3, h4 {
-  font-family: var(--font-heading);
-}
-
-.font-mono-stat {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
-}
-
 /* Tactical radar background texture */
->>>>>>> 2018447 (Add ML-based detector and account graph features)
 .radar-grid {
   background-size: 44px 44px;
   background-image: linear-gradient(to right, rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.025) 1px, transparent 1px);
