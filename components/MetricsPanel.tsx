@@ -51,11 +51,13 @@ function ConfusionCell({
   label,
   value,
   color,
+  valueColor,
   description,
 }: {
   label: string;
   value: number;
   color: string;
+  valueColor: string;
   description: string;
 }) {
   return (
@@ -63,7 +65,7 @@ function ConfusionCell({
       <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
         {label}
       </div>
-      <div className="text-xl font-bold font-mono-stat text-white">{value}</div>
+      <div className={`text-xl font-bold font-mono-stat ${valueColor}`}>{value}</div>
       <div className="text-[10px] text-slate-400 mt-0.5">{description}</div>
     </div>
   );
@@ -118,23 +120,27 @@ export default function MetricsPanel({ metrics, loading }: MetricsPanelProps) {
         </span>
       </div>
 
-      {/* Primary Stat Cards */}
-      <div className="grid grid-cols-3 gap-2">
+      {/* Primary Stat Cards — F1 is the headline blended metric, so it gets
+          visual priority (glow + brighter border) over its two inputs. */}
+      <div className="grid grid-cols-3 gap-2.5">
         <StatCard
           label="Precision"
           value={`${(metrics.precision * 100).toFixed(1)}%`}
-          color="text-teal-400"
+          color="text-slate-200"
         />
         <StatCard
           label="Recall"
           value={`${(metrics.recall * 100).toFixed(1)}%`}
-          color="text-teal-400"
+          color="text-slate-200"
         />
-        <StatCard
-          label="F1 Score"
-          value={`${(metrics.f1 * 100).toFixed(1)}%`}
-          color="text-teal-300"
-        />
+        <div className="glass-card glow-teal-sm rounded-xl p-3.5 text-center border border-teal-500/35 relative overflow-hidden">
+          <div className="text-teal-300/80 text-[10px] font-semibold uppercase tracking-wider mb-1">
+            F1 Score
+          </div>
+          <div className="text-2xl font-bold font-mono-stat text-teal-300">
+            {`${(metrics.f1 * 100).toFixed(1)}%`}
+          </div>
+        </div>
       </div>
 
       {/* Algorithm Variance Note */}
@@ -155,24 +161,28 @@ export default function MetricsPanel({ metrics, loading }: MetricsPanelProps) {
             label="True Positive"
             value={metrics.tp}
             color="border-teal-500/30 bg-teal-500/5"
+            valueColor="text-teal-300"
             description="Correctly identified risk"
           />
           <ConfusionCell
             label="False Positive"
             value={metrics.fp}
             color="border-amber-500/30 bg-amber-500/5"
+            valueColor="text-amber-300"
             description="Legitimate item reviewed"
           />
           <ConfusionCell
             label="False Negative"
             value={metrics.fn}
             color="border-red-500/30 bg-red-500/5"
+            valueColor="text-red-300"
             description="Missed risky item"
           />
           <ConfusionCell
             label="True Negative"
             value={metrics.tn}
             color="border-slate-800 bg-slate-900/60"
+            valueColor="text-slate-300"
             description="Correctly safe"
           />
         </div>

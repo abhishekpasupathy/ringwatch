@@ -148,7 +148,16 @@ export default function DashboardClient() {
 
 function Metric({ label, value, icon, tone = "teal" }: { label: string; value: string; icon: React.ReactNode; tone?: "teal" | "red" | "amber" }) {
   const text = tone === "red" ? "text-red-300" : tone === "amber" ? "text-amber-300" : "text-teal-300";
-  return <div className="glass-card rounded-xl px-3.5 py-2.5 flex items-center gap-3"><div className={`${text} opacity-90`}>{icon}</div><div className="min-w-0"><div className="section-label mb-1">{label}</div><div className={`metric-number text-[15px] font-bold ${text}`}>{value}</div></div></div>;
+  const chip = tone === "red" ? "bg-red-500/10 border-red-500/20" : tone === "amber" ? "bg-amber-500/10 border-amber-500/20" : "bg-teal-500/10 border-teal-500/20";
+  return (
+    <div className="glass-card glass-card-hover rounded-xl px-3.5 py-3 flex items-center gap-3">
+      <div className={`${text} ${chip} border rounded-lg p-1.5 flex items-center justify-center`}>{icon}</div>
+      <div className="min-w-0">
+        <div className="section-label mb-1">{label}</div>
+        <div className={`metric-number text-lg font-bold ${text}`}>{value}</div>
+      </div>
+    </div>
+  );
 }
 function Legend({ color, label, glow = "" }: { color: string; label: string; glow?: string }) { return <div className="flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full ${color} ${glow}`} />{label}</div>; }
 function Health({ label, value }: { label: string; value: string }) { return <div className="rounded-lg bg-white/[.025] border border-white/[.06] p-2"><div className="text-[8px] font-mono text-slate-500 tracking-wider">{label}</div><div className="metric-number text-xs text-slate-200 mt-1">{value}</div></div>; }
