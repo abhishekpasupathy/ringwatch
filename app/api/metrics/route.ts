@@ -1,21 +1,16 @@
 /**
  * RingWatch — /api/metrics route
  *
- * Returns the most recent eval metrics (from the TEST evaluation run).
- * These are displayed prominently in the MetricsPanel on the dashboard.
- *
- * NOTE: This returns the metrics but NOT the threshold value.
- * The threshold is stored in DetectionRun.threshold (server-side only).
+ * Returns the most recent evaluation metrics. The dashboard defaults to the
+ * stronger supervised benchmark; the temporal graph baseline is available
+ * explicitly with ?source=temporal.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { ensureDataSeeded } from "@/lib/auto-seed";
-<<<<<<< HEAD
 import { SUPERVISED_BENCHMARK } from "@/lib/supervised-benchmark";
-=======
 import { demoMetrics } from "@/lib/demo-data";
->>>>>>> 2018447 (Add ML-based detector and account graph features)
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,23 +19,17 @@ const NO_STORE_HEADERS = { "Cache-Control": "no-store, max-age=0" };
 
 export async function GET(req: NextRequest) {
   try {
-<<<<<<< HEAD
     // The dashboard defaults to the stronger supervised benchmark. The graph
     // baseline remains available explicitly for diagnostic comparison.
     if (new URL(req.url).searchParams.get("source") !== "temporal") {
       return NextResponse.json(SUPERVISED_BENCHMARK, { headers: NO_STORE_HEADERS });
     }
 
+    // Temporal metrics can still be demonstrated without a configured DB.
     if (!process.env.DATABASE_URL) {
-      return NextResponse.json({ error: "DATABASE_URL not configured" }, { status: 500, headers: NO_STORE_HEADERS });
+      return NextResponse.json(demoMetrics, { headers: NO_STORE_HEADERS });
     }
 
-=======
-    if (!process.env.DATABASE_URL) {
-      return NextResponse.json(demoMetrics);
-    }
-
->>>>>>> 2018447 (Add ML-based detector and account graph features)
     let m = await prisma.evalMetrics.findFirst({
       where: { split: "TEST" },
       orderBy: { runAt: "desc" },
