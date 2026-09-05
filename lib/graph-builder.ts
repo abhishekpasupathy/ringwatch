@@ -97,11 +97,10 @@ export function buildGraph(
       txCount,
       avgAmount,
       hasBurst,
+      // Keep the actual set on the edge (not just a per-edge count) so
+      // community scoring can calculate diversity across the whole community.
       paymentFormats: Array.from(edge.paymentFormats).sort(),
       paymentFormatCount: edge.paymentFormats.size,
-      // Keep the actual set on the edge so community scoring can calculate
-      // diversity across the whole community (not just a per-edge count).
-      paymentFormats: Array.from(edge.paymentFormats),
     });
   }
 
