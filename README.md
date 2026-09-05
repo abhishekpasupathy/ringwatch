@@ -84,21 +84,26 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-    participant Analyst
-    participant UI as RingWatch dashboard
+    actor Analyst
+    participant UI as RingWatch Dashboard
     participant API as Next.js API
-    participant DB as Postgres
-    participant LLM as Groq
+    participant DB as PostgreSQL
+    participant LLM as Groq LLM
 
-    Analyst->>UI: Select an account or a live demo chip
+    Analyst->>UI: Select account or live demo
     UI->>API: Request account and cluster context
     API->>DB: Read latest persisted detection run
-    DB-->>API: Structural evidence only
-    API-->>UI: Status, cluster context, and graph focus
-    UI->>API: Request explanation for a flagged cluster
-    API->>LLM: Qualitative structural evidence only
-    LLM-->>API: Plain-language explanation
-    API-->>UI: Explanation; decision remains unchanged
+    DB-->>API: Return structural evidence
+    API-->>UI: Status, cluster context and graph focus
+
+    Analyst->>UI: Request explanation for flagged cluster
+    UI->>API: Send cluster evidence
+    API->>LLM: Send structural evidence only
+    LLM-->>API: Generate plain-language explanation
+    API-->>UI: Display explanation
+    UI-->>Analyst: Show explanation
+
+    Note over LLM,UI: Explanation helps investigation but never changes the detection decision
 ```
 
 ## Product capabilities
