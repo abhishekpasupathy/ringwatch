@@ -366,6 +366,9 @@ const ForceGraphWrapper = forwardRef<ForceGraphHandle, ForceGraphWrapperProps>(
         )}
 
         <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1.5">
+          <div className="w-9 py-1 glass-panel border border-white/10 rounded-lg text-center text-slate-400 text-[10px] font-mono">
+            {Math.round(currentZoom * 100)}%
+          </div>
           <button
             onClick={handleZoomIn}
             className="w-9 h-9 glass-panel border border-white/10 rounded-lg flex items-center justify-center text-slate-300 hover:text-white hover:border-teal-500/40 transition-all"
