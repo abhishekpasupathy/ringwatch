@@ -14,6 +14,8 @@
  *   - Highlights neighbor nodes
  *   - Dims non-connected network paths
  *   - Shows account ID tooltip on hover
+ *
+ * Build guard: this file is intentionally kept free of Git merge-conflict markers.
  */
 
 import dynamic from "next/dynamic";
@@ -216,7 +218,6 @@ const ForceGraphWrapper = forwardRef<ForceGraphHandle, ForceGraphWrapperProps>(
         const isHovered = hoverNode?.id === gNode.id;
         const isNeighbor = neighborSet.neighbors.has(gNode.id);
 
-        // Node sizing
         let baseRadius = 4;
         if (gNode.isFlagged) {
           baseRadius = gNode.suspicionTier === "HIGH" ? 7 : 5.5;
@@ -226,20 +227,17 @@ const ForceGraphWrapper = forwardRef<ForceGraphHandle, ForceGraphWrapperProps>(
 
         const r = baseRadius / globalScale;
 
-        // Color selection
-        let coreColor = "#3b82f6"; // Safe blue
+        let coreColor = "#3b82f6";
         let glowColor = "rgba(59, 130, 246, 0.35)";
 
         if (gNode.isIllicit) {
-          coreColor = "#ef4444"; // Red ring member
+          coreColor = "#ef4444";
           glowColor = "rgba(239, 68, 68, 0.4)";
         } else if (gNode.isExposed) {
-          coreColor = "#f59e0b"; // Amber exposed merchant
+          coreColor = "#f59e0b";
           glowColor = "rgba(245, 158, 11, 0.4)";
         }
 
-        // Keep risk nodes visible during hover. Previously all non-neighbors
-        // were faded to 20%, which made nearby ring nodes appear to disappear.
         const isDimmed = hoverNode && !isNeighbor;
         const opacity = !isDimmed
           ? 1
@@ -248,7 +246,6 @@ const ForceGraphWrapper = forwardRef<ForceGraphHandle, ForceGraphWrapperProps>(
         ctx.save();
         ctx.globalAlpha = opacity;
 
-        // Animated pulse glow for ring members
         if (gNode.isIllicit) {
           const phase = (pulseTimeRef.current % 2000) / 2000;
           const pulseScale = 1 + 0.45 * Math.sin(phase * 2 * Math.PI);
@@ -263,7 +260,6 @@ const ForceGraphWrapper = forwardRef<ForceGraphHandle, ForceGraphWrapperProps>(
           ctx.fill();
         }
 
-        // Outer glowing radial halo for flagged nodes or hovered nodes
         if (gNode.isFlagged || isHovered || isSelected) {
           const glowRadius = r * (isHovered ? 3.5 : 2.5);
           const gradient = ctx.createRadialGradient(x, y, r * 0.5, x, y, glowRadius);
@@ -276,20 +272,17 @@ const ForceGraphWrapper = forwardRef<ForceGraphHandle, ForceGraphWrapperProps>(
           ctx.fill();
         }
 
-        // Core node circle
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
         ctx.fillStyle = coreColor;
         ctx.fill();
 
-        // Sharp white ring for selected / hovered nodes
         if (isSelected || isHovered) {
           ctx.lineWidth = 1.5 / globalScale;
           ctx.strokeStyle = "#ffffff";
           ctx.stroke();
         }
 
-        // Label at high zoom or on hover
         if (globalScale > 2.8 || isHovered) {
           const label = gNode.id.split("_").slice(-1)[0];
           ctx.font = `${Math.max(9 / globalScale, 2)}px 'JetBrains Mono', monospace`;
@@ -363,7 +356,6 @@ const ForceGraphWrapper = forwardRef<ForceGraphHandle, ForceGraphWrapperProps>(
           autoPauseRedraw={false}
         />
 
-        {/* Hover tooltip */}
         {hoverNode && mousePos && (
           <div
             className="absolute pointer-events-none z-20 px-2.5 py-1.5 rounded-lg glass-panel border border-teal-500/30 text-teal-300 text-xs font-mono font-bold shadow-lg shadow-teal-500/10"
@@ -373,7 +365,6 @@ const ForceGraphWrapper = forwardRef<ForceGraphHandle, ForceGraphWrapperProps>(
           </div>
         )}
 
-        {/* Zoom controls */}
         <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1.5">
           <button
             onClick={handleZoomIn}
@@ -393,21 +384,21 @@ const ForceGraphWrapper = forwardRef<ForceGraphHandle, ForceGraphWrapperProps>(
             onClick={handleResetView}
             className="w-9 h-9 glass-panel border border-white/10 rounded-lg flex items-center justify-center text-slate-300 hover:text-white hover:border-teal-500/40 transition-all"
             aria-label="Reset view"
-            title="Reset view"
           >
             <Maximize2 size={16} />
           </button>
         </div>
 
-        {/* Simulation status indicator */}
         {simulationFrozen && (
-          <div className="absolute bottom-4 left-4 z-10 text-[9px] font-mono text-slate-500 uppercase tracking-widest">
-            Layout locked · {Math.round(currentZoom * 100)}%
+          <div className="absolute top-3 right-3 z-10 px-2 py-1 rounded border border-white/10 bg-black/30 text-[10px] font-mono text-slate-500 pointer-events-none">
+            STATIC
           </div>
         )}
       </div>
     );
   }
 );
+
+ForceGraphWrapper.displayName = "ForceGraphWrapper";
 
 export default ForceGraphWrapper;
